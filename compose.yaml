@@ -1,0 +1,36 @@
+services:
+  proxy:
+    container_name: ecommerce-proxy
+    image: traefik:v2.11
+    command: --providers.docker
+    ports:
+      - 80:80
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  mysql:
+    container_name: ecomerce-database
+    image: mysql:8.0
+    env_file:
+      - ./db/.env
+    volumes:
+      - ecommerce-mysql-data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    container_name: ecommerce-smtp-server
+    image: mailhog/mailhog:v1.0.1
+    logging:
+      driver: "none"
+    labels:
+      traefik.http.routers.mailhog.rule: Host(`email.localhost`)
+      traefik.http.services.mailhog.loadbalancer.server.port: 8025
+
+volumes:
+  ecommerce-mysql-data:

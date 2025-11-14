@@ -1,0 +1,36 @@
+erDiagram
+    user {
+        string uuid
+        string name
+        string email
+        datetime created_at
+    }
+    magic {
+        string token
+        string expiration_date
+        string belongs_to
+    }
+    user ||--|| magic : has
+    products {
+        string uuid
+        string name
+        decimal(15) price
+        int cuantity
+        string belongs_to
+        datetime created_at
+        datetime updated_at
+    }
+    user ||--|{ products : sell
+    tickets {
+        string uuid
+        datetime created_at
+        string by
+    }
+    user ||--|{ tickets: generate
+    purchase {
+        string ticket
+        string product
+        string created_at
+    }
+    tickets }|--|{ purchase : include
+    products }|--|{ purchase : are_in
