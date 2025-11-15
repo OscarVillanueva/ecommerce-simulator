@@ -1,0 +1,10 @@
+[tools]
+go = "latest"
+
+[tasks.install]
+description = "Clean and install dependencies"
+run = "go mod tidy"
+
+[tasks.dev]
+description = "Build the go api"
+run = "go run cmd/api/main.go"
