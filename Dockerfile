@@ -1,3 +1,12 @@
+FROM golang:latest
 
-CMD ["echo", "'Hello World Docker!'"]
+WORKDIR /app
+
+COPY backend/ ./api/
+
+WORKDIR /app/api
+
+RUN go mod tidy
+
+CMD ["go", "run", "cmd/api/main.go"]
 

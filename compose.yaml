@@ -32,5 +32,10 @@ services:
       traefik.http.routers.mailhog.rule: Host(`email.localhost`)
       traefik.http.services.mailhog.loadbalancer.server.port: 8025
 
+  backend:
+    container_name: go-ecommerce-api
+    build:
+      context: ./
+
 volumes:
   ecommerce-mysql-data:
