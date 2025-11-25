@@ -1,32 +1,28 @@
 package main
 
 import (
-	"log"
 	"fmt"
-	"os"
+	"net/http"
 
-	"github.com/joho/godotenv"
-	"github.com/OscarVillanueva/goapi/internal/platform"
+	"github.com/OscarVillanueva/goapi/internal/handlers"
+	"github.com/go-chi/chi"
+	log "github.com/sirupsen/logrus"
 )
 
 func main()  {
-	err := godotenv.Load()
+	log.SetReportCaller(true)
+
+	var r *chi.Mux = chi.NewRouter()
+	
+	handlers.Router(r)
+
+	fmt.Println("Starting GO API Server")
+
+	err := http.ListenAndServe("localhost:4321", r)
 
 	if err != nil {
-		log.Println("Couldn't load env file")
+		log.Error(err)
 	}
-
-	dbHost := os.Getenv("DB_HOST")
-	dbName := os.Getenv("DB_DATABASE")
-	dbUser := fmt.Sprintf("%s:%s", os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"))
-
-	db := platform.DBConnection {
-		Host: dbHost,
-		Database: dbName,
-		User: dbUser,
-	}
-
-	db.Connect()
 }
 
 
