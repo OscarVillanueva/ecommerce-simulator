@@ -6,6 +6,8 @@ import (
 	"time"
 	"fmt"
 
+	"github.com/OscarVillanueva/goapi/internal/app/internal"
+
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	chimiddle "github.com/go-chi/chi/middleware"
@@ -14,6 +16,8 @@ import (
 func Router(r *chi.Mux) {
 
 	r.Use(chimiddle.StripSlashes)
+
+	r.Route("/", internal.AuthRouter)
 
 	r.Route("/ping", func(router chi.Router){
 		router.Get("/", func(w http.ResponseWriter, r *http.Request) {
