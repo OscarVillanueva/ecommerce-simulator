@@ -3,6 +3,8 @@ package handlers
 import (
 	"net/http"
 	"encoding/json"
+	"time"
+	"fmt"
 
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
@@ -15,14 +17,13 @@ func Router(r *chi.Mux) {
 
 	r.Route("/ping", func(router chi.Router){
 		router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-
 			response := struct {
-				message string
+				Message string `json:"message"`
 			}{
-				message: "Its alive . . .",
+				Message: fmt.Sprintf("Current time: %v", time.Now()),
 			}
 
+			w.Header().Set("Content-Type", "application/json")
 			err := json.NewEncoder(w).Encode(response)
 
 			if err != nil {
