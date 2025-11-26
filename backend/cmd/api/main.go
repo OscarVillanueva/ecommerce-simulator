@@ -5,15 +5,12 @@ import (
 	"net/http"
 
 	"github.com/OscarVillanueva/goapi/internal/app/handlers"
-	"github.com/OscarVillanueva/goapi/internal/platform"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 )
 
 func main()  {
 	log.SetReportCaller(true)
-
-	go platform.GetInstance()
 
 	var r *chi.Mux = chi.NewRouter()
 	
