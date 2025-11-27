@@ -50,8 +50,8 @@ services:
     build:
       context: ./
     labels:
-      traefik.http.routers.mailhog.rule: Host(`api.localhost`)
-      traefik.http.services.mailhog.loadbalancer.server.port: 4321
+      traefik.http.routers.backend.rule: Host(`api.localhost`)
+      traefik.http.services.backend.loadbalancer.server.port: 4321
 
 volumes:
   ecommerce-mysql-data:
