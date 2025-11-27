@@ -11,8 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lock = &sync.Mutex{}
-var SharedInstance *gorm.DB
+var once sync.Once
+var sharedInstance *gorm.DB
 
 type dbConnection struct {
 	Host string
@@ -28,7 +28,8 @@ func (db dbConnection) Connect() (*gorm.DB, error) {
 	return connection, err
 }
 
-func GetInstance() {
+func GetInstance() (*gorm.DB) {
+	/* DLC singleton
 	if SharedInstance == nil {
 		lock.Lock()
 		defer lock.Unlock()
@@ -68,5 +69,39 @@ func GetInstance() {
 		}
 	} else {
 		log.Info("Instance already created")
-	}
+	}*/
+
+	once.Do(func() {
+		log.Info("Creating a db instance")
+
+		err := godotenv.Load()
+
+		if err != nil {
+			log.Warning("Could't load env: ", err)
+			return
+		}
+		
+		dbHost := os.Getenv("DB_HOST")
+		dbName := os.Getenv("DB_DATABASE")
+		dbUser := fmt.Sprintf("%s:%s", os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"))	
+
+		dbConn := dbConnection {
+			Host: dbHost,
+			Database: dbName,
+			User: dbUser,
+		}
+
+		db, err := dbConn.Connect()
+
+		if err != nil {
+			log.Warning("Couldn't connect to the database: ", err)
+			return
+		}
+
+		sharedInstance = db
+
+		log.Info("Instance Created")
+	})
+
+	return sharedInstance
 }

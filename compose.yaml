@@ -42,8 +42,16 @@ services:
     container_name: go-ecommerce-api
     env_file:
      - ./backend/.env
+    develop:
+      watch:
+        - path: ./backend/
+          action: rebuild
+          target: ./api
     build:
       context: ./
+    labels:
+      traefik.http.routers.mailhog.rule: Host(`api.localhost`)
+      traefik.http.services.mailhog.loadbalancer.server.port: 4321
 
 volumes:
   ecommerce-mysql-data:
