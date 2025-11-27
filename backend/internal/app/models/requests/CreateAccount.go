@@ -1,4 +1,4 @@
-package models
+package requests
 
 type CreateAccount struct {
 	Name string `json:"name"`
