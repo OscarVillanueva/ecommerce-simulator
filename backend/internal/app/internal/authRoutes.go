@@ -7,7 +7,8 @@ import (
 	"encoding/json"
 
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
-	"github.com/OscarVillanueva/goapi/internal/app/models"
+	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
+	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
 	"gorm.io/gorm"
@@ -20,33 +21,36 @@ func AuthRouter(router chi.Router) {
 	router.Post("/create-account", func(w http.ResponseWriter, r *http.Request){
 		w.Header().Set("Content-Type", "application/json")
 
-		account := models.CreateAccount{}
+		account := requests.CreateAccount{}
 
 		err := json.NewDecoder(r.Body).Decode(&account)
 
 		if err != nil {
 			log.Error(err)
 			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
+			return
 		}
 
 		db := platform.GetInstance()
 
-		if db != nil {
+		if db == nil {
 			tools.InternalServerErrorHandler(w)
+			return
 		}
 
-		user := models.User{
-			Uuid: uuid.New(),
+		user := dao.User{
+			Uuid: uuid.New().String(),
 			Name: account.Name,
 			Email: account.Email,
 			CreatedAt: time.Now(),
 		}
 
-		err = gorm.G[models.User](db).Create(r.Context(), &user)
+		err = gorm.G[dao.User](db).Create(r.Context(), &user)
 
 		if err != nil {
 			log.Error(err)
 			tools.InternalServerErrorHandler(w)
+			return
 		}
 
 		err = json.NewEncoder(w).Encode(user)
