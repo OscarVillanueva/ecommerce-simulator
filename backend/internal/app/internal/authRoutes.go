@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"time"
 	"errors"
 	"net/http"
@@ -42,6 +43,7 @@ func AuthRouter(router chi.Router) {
 			Uuid: uuid.New().String(),
 			Name: account.Name,
 			Email: account.Email,
+			Verified: false,
 			CreatedAt: time.Now(),
 		}
 
@@ -53,11 +55,41 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
-		err = json.NewEncoder(w).Encode(user)
+		sender, err := platform.GetEmailSenderManager()
 
 		if err != nil {
 			log.Error(err)
+			tools.ServiceUnavailableErrorHandler(w)
+			return
 		}
+
+		token := tools.GenerateSecureToken(3)
+
+		to := []string{account.Email}
+		msg := []byte(fmt.Sprintf("Use this token to verify your account: %s", token))
+
+		_, err = sender.SendEmail(to, msg)
+
+		if err != nil {
+			log.Warning("Couldn't send the email: ", err)
+			tools.ServiceUnavailableErrorHandler(w)
+			return
+		}
+
+		resp := tools.Message {
+			Message: "Token sended to the given email, please verify the account",
+			Data: "success",
+		}
+
+		resp.WriteMessage(w)
+	})
+
+	router.Post("/verify-account", func(w http.ResponseWriter, r *http.Request) {
+		// TODO: Chance the verify flag in database
+	})
+
+	router.Post("/resend-code", func(w http.ResponseWriter, r *http.Request){
+		// TODO: Create a new token to resend to the requested email
 	})
 
 	router.Get("/login", func(w http.ResponseWriter, r *http.Request){
