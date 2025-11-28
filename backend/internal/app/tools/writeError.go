@@ -26,6 +26,9 @@ var (
 	BadRequestErrorHandler = func(w http.ResponseWriter, err error) {
 		writeError(w, err.Error(), http.StatusBadRequest)
 	}
+	UnprocessableContent = func(w http.ResponseWriter, message string) {
+		writeError(w, message, http.StatusUnprocessableEntity)
+	}
 	InternalServerErrorHandler = func(w http.ResponseWriter) {
 		writeError(w, "An unexpected expected error occured", http.StatusInternalServerError)
 	}

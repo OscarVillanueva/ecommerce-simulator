@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
+	mysql "github.com/go-sql-driver/mysql"
 )
 
 func AuthRouter(router chi.Router) {
@@ -49,7 +50,18 @@ func AuthRouter(router chi.Router) {
 
 		err = gorm.G[dao.User](db).Create(r.Context(), &user)
 
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+		}
+
 		if err != nil {
+			var mysqlErr *mysql.MySQLError
+
+			if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+				log.Error(err)
+				tools.UnprocessableContent(w, "The email already exists")
+				return
+			}
+
 			log.Error(err)
 			tools.InternalServerErrorHandler(w)
 			return
