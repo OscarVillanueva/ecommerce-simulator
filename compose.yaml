@@ -49,6 +49,9 @@ services:
           target: ./api
     build:
       context: ./
+    depends_on:
+      mysql:
+        condition: service_healthy
     labels:
       traefik.http.routers.backend.rule: Host(`api.localhost`)
       traefik.http.services.backend.loadbalancer.server.port: 4321

@@ -8,3 +8,7 @@ run = "go mod tidy"
 [tasks.dev]
 description = "Build the go api"
 run = "go run cmd/api/main.go"
+
+[tasks.rebuild]
+description = "Rebuild backend service in docker"
+run = "docker compose up -d --build backend"
