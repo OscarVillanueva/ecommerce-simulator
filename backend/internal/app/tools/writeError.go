@@ -29,4 +29,7 @@ var (
 	InternalServerErrorHandler = func(w http.ResponseWriter) {
 		writeError(w, "An unexpected expected error occured", http.StatusInternalServerError)
 	}
+	ServiceUnavailableErrorHandler = func(w http.ResponseWriter) {
+		writeError(w, "The server is not ready to handle the request", http.StatusServiceUnavailable)
+	}
 )
