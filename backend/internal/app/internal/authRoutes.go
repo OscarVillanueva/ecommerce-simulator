@@ -36,7 +36,7 @@ func AuthRouter(router chi.Router) {
 		db := platform.GetInstance()
 
 		if db == nil {
-			tools.InternalServerErrorHandler(w)
+			tools.InternalServerErrorHandler(w, nil)
 			return
 		}
 
@@ -45,13 +45,10 @@ func AuthRouter(router chi.Router) {
 			Name: account.Name,
 			Email: account.Email,
 			Verified: false,
-			CreatedAt: time.Now(),
+			CreatedAt: time.Now().UTC(),
 		}
 
 		err = gorm.G[dao.User](db).Create(r.Context(), &user)
-
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
-		}
 
 		if err != nil {
 			var mysqlErr *mysql.MySQLError
@@ -63,7 +60,7 @@ func AuthRouter(router chi.Router) {
 			}
 
 			log.Error(err)
-			tools.InternalServerErrorHandler(w)
+			tools.InternalServerErrorHandler(w, nil)
 			return
 		}
 
@@ -76,6 +73,21 @@ func AuthRouter(router chi.Router) {
 		}
 
 		token := tools.GenerateSecureToken(3)
+
+		magic := dao.Magic {
+			Token: token,
+			ExpirationDate: time.Now().UTC().Add(15 * time.Minute),
+			BelongsTo: user.Uuid,
+		}
+
+		err = gorm.G[dao.Magic](db).Create(r.Context(), &magic)
+
+		if err != nil {
+			log.Error(err)
+			msg := "Account creatd but we couldn't create the verification code, request another account"
+			tools.InternalServerErrorHandler(w, &msg)
+			return
+		}
 
 		to := []string{account.Email}
 		msg := []byte(fmt.Sprintf("Use this token to verify your account: %s", token))

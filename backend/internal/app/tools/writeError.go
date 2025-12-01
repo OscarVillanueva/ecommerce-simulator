@@ -29,8 +29,14 @@ var (
 	UnprocessableContent = func(w http.ResponseWriter, message string) {
 		writeError(w, message, http.StatusUnprocessableEntity)
 	}
-	InternalServerErrorHandler = func(w http.ResponseWriter) {
-		writeError(w, "An unexpected expected error occured", http.StatusInternalServerError)
+	InternalServerErrorHandler = func(w http.ResponseWriter, message *string) {
+		msg := "An unexpected expected error occured"
+
+		if message != nil {
+			msg = *message
+		}
+
+		writeError(w, msg, http.StatusInternalServerError)
 	}
 	ServiceUnavailableErrorHandler = func(w http.ResponseWriter) {
 		writeError(w, "The server is not ready to handle the request", http.StatusServiceUnavailable)
