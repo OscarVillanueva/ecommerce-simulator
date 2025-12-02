@@ -41,4 +41,13 @@ var (
 	ServiceUnavailableErrorHandler = func(w http.ResponseWriter) {
 		writeError(w, "The server is not ready to handle the request", http.StatusServiceUnavailable)
 	}
+	UnauthorizedErrorHandler = func(w http.ResponseWriter, message *string) {
+		msg := "Authorized user"
+
+		if message != nil {
+			msg = *message
+		}
+
+		writeError(w, msg, http.StatusUnauthorized)
+	}
 )

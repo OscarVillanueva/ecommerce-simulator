@@ -10,6 +10,7 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
+	"github.com/OscarVillanueva/goapi/internal/app/routines"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
 	"gorm.io/gorm"
@@ -109,7 +110,73 @@ func AuthRouter(router chi.Router) {
 	})
 
 	router.Post("/verify-account", func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Chance the verify flag in database
+		w.Header().Set("Content-Type", "application/json")
+
+		verify := requests.VerifyAccount{}
+
+		err := json.NewDecoder(r.Body).Decode(&verify)
+
+		if err != nil {
+			log.Error(err)
+			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
+			return
+		}
+
+		// Revisar el usuario -> async
+		user := dao.User{}
+		userChan := make(chan bool)
+		go routines.FindUser(verify.Email, &user, userChan)
+
+		// Revisar el token -> async
+		magic := dao.Magic{}
+		magicChan := make(chan bool)
+		go routines.FindToken(verify.Token, &magic, magicChan)
+
+		// Revisar channels
+		userResult := <- userChan
+		magicResult := <- magicChan
+
+		if !userResult || !magicResult{
+			log.Error("Provided data do not exists")
+			tools.UnprocessableContent(w, "The token or email are invalid")
+			return
+		}
+
+		current := time.Now().UTC()
+
+		if user.Uuid != magic.BelongsTo || magic.ExpirationDate.Before(current) {
+			log.Error("The token do not belong to the user")
+
+			msg := "Expired Token"
+			tools.UnauthorizedErrorHandler(w, &msg)
+			return
+		}
+	
+		// Actualizar el usuario -> sync
+		db := platform.GetInstance()
+
+		user.Verified = true
+
+		_, err = gorm.G[dao.User](db).Where("uuid = ?", user.Uuid).Update(r.Context(), "verified", true)
+
+		if err != nil {
+			log.Error("We couldnt verify the user")
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(fmt.Sprintf("user %s with token %s", user.Uuid, magic.Token))
+
+		if err != nil {
+			log.Error(err)
+		}
+
+		resp := tools.Message {
+			Message: "Verified account",
+			Data: "success",
+		}
+
+		resp.WriteMessage(w)
 	})
 
 	router.Post("/resend-code", func(w http.ResponseWriter, r *http.Request){
