@@ -1,4 +1,4 @@
-package internal
+package handlers
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
-	"github.com/OscarVillanueva/goapi/internal/app/routines"
+	"github.com/OscarVillanueva/goapi/internal/app/internal/db"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
 	"gorm.io/gorm"
@@ -122,21 +122,12 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
-		// Revisar el usuario -> async
 		user := dao.User{}
-		userChan := make(chan bool)
-		go routines.FindUser(verify.Email, &user, userChan)
-
-		// Revisar el token -> async
 		magic := dao.Magic{}
-		magicChan := make(chan bool)
-		go routines.FindToken(verify.Token, &magic, magicChan)
 
-		// Revisar channels
-		userResult := <- userChan
-		magicResult := <- magicChan
+		err = db.FindToken(verify.Token, verify.Email, &magic, &user)
 
-		if !userResult || !magicResult{
+		if err != nil {
 			log.Error("Provided data do not exists")
 			tools.UnprocessableContent(w, "The token or email are invalid")
 			return
@@ -144,7 +135,7 @@ func AuthRouter(router chi.Router) {
 
 		current := time.Now().UTC()
 
-		if user.Uuid != magic.BelongsTo || magic.ExpirationDate.Before(current) {
+		if magic.ExpirationDate.Before(current) {
 			log.Error("The token do not belong to the user")
 
 			msg := "Expired Token"
@@ -155,9 +146,7 @@ func AuthRouter(router chi.Router) {
 		// Actualizar el usuario -> sync
 		db := platform.GetInstance()
 
-		user.Verified = true
-
-		_, err = gorm.G[dao.User](db).Where("uuid = ?", user.Uuid).Update(r.Context(), "verified", true)
+		err = db.Model(&user).Where("email = ?", verify.Email).Update("verified", true).Error
 
 		if err != nil {
 			log.Error("We couldnt verify the user")
@@ -165,10 +154,10 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
-		err = json.NewEncoder(w).Encode(fmt.Sprintf("user %s with token %s", user.Uuid, magic.Token))
+		_, err = gorm.G[dao.Magic](db).Where("token = ? AND belongs_to = ?", magic.Token, magic.BelongsTo).Delete(r.Context())
 
 		if err != nil {
-			log.Error(err)
+			log.Error("We couldnt delete the token")
 		}
 
 		resp := tools.Message {
