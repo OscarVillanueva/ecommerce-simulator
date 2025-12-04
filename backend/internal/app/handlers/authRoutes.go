@@ -112,52 +112,45 @@ func AuthRouter(router chi.Router) {
 	router.Post("/verify-account", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		verify := requests.VerifyAccount{}
-
-		err := json.NewDecoder(r.Body).Decode(&verify)
-
-		if err != nil {
+		var verify requests.VerifyAccount
+		if err := json.NewDecoder(r.Body).Decode(&verify); err != nil {
 			log.Error(err)
 			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
 			return
 		}
 
-		user := dao.User{}
-		magic := dao.Magic{}
-
-		err = db.FindToken(verify.Token, verify.Email, &magic, &user)
-
-		if err != nil {
-			log.Error("Provided data do not exists")
+		var magic dao.Magic
+		if err := db.FindToken(verify.Token, verify.Email, &magic, &dao.User{}); err != nil {
 			tools.UnprocessableContent(w, "The token or email are invalid")
 			return
 		}
 
-		current := time.Now().UTC()
-
-		if magic.ExpirationDate.Before(current) {
-			log.Error("The token do not belong to the user")
-
+		if magic.ExpirationDate.Before(time.Now().UTC()) {
 			msg := "Expired Token"
 			tools.UnauthorizedErrorHandler(w, &msg)
 			return
 		}
 	
-		// Actualizar el usuario -> sync
-		db := platform.GetInstance()
+		sharedDB := platform.GetInstance()
 
-		err = db.Model(&user).Where("email = ?", verify.Email).Update("verified", true).Error
+		err := sharedDB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
 
-		if err != nil {
-			log.Error("We couldnt verify the user")
-			tools.InternalServerErrorHandler(w, nil)
-			return
-		}
+			userError := tx.Model(&dao.User{}).Where("uuid = ?", magic.BelongsTo).Update("verified", true).Error
+			if userError != nil {
+				return userError
+			}
 
-		_, err = gorm.G[dao.Magic](db).Where("token = ? AND belongs_to = ?", magic.Token, magic.BelongsTo).Delete(r.Context())
+			if magicError := tx.Where("token = ?", magic.Token).Delete(&magic).Error; magicError != nil {
+				return magicError
+			}
+
+			return nil
+		})
 
 		if err != nil {
 			log.Error("We couldnt delete the token")
+			tools.InternalServerErrorHandler(w, nil)
+			return
 		}
 
 		resp := tools.Message {
