@@ -192,7 +192,8 @@ func AuthRouter(router chi.Router) {
 
 		var magic dao.Magic
 		if err := db.RegenerateMagicLink(r.Context(), user.Uuid, &magic); err != nil {
-
+			tools.InternalServerErrorHandler(w, nil)
+			return nil
 		}
 
 		to := []string{resend.Email}
