@@ -162,7 +162,54 @@ func AuthRouter(router chi.Router) {
 	})
 
 	router.Post("/resend-code", func(w http.ResponseWriter, r *http.Request){
-		// TODO: Create a new token to resend to the requested email
+		w.Header().Set("Content-Type", "application/json")
+
+		var resend requests.ResendCode
+		if err := json.NewDecoder(r.Body).Decode(&resend); err != nil {
+			log.Error(err)
+			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
+			return
+		}
+
+		sender, err := platform.GetEmailSenderManager()
+
+		if err != nil {
+			log.Error(err)
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
+		var user dao.User
+		if err := db.FetchUser(resend.Email, &user, r.Context()); err != nil {
+			resp := tools.Message {
+				Message: "If an account exists with this email, a code has been sent",
+				Data: "success",
+			}
+
+			resp.WriteMessage(w)
+			return
+		}
+
+		var magic dao.Magic
+		if err := db.RegenerateMagicLink(r.Context(), user.Uuid, &magic); err != nil {
+
+		}
+
+		to := []string{resend.Email}
+		msg := []byte(fmt.Sprintf("Use this token to verify your account: %s", magic.Token))
+
+		if ok, err := sender.SendEmail(to, msg); !ok {
+			log.Error(err)
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
+		resp := tools.Message {
+			Message: "If an account exists with this email, a code has been sent",
+			Data: "success",
+		}
+
+		resp.WriteMessage(w)
 	})
 
 	router.Get("/login", func(w http.ResponseWriter, r *http.Request){
