@@ -29,7 +29,7 @@ func RegenerateMagicLink(ctx context.Context, uuid string, magic *dao.Magic) err
 
 		token := tools.GenerateSecureToken(3)
 
-		magic = &dao.Magic {
+		*magic = dao.Magic {
 			Token: token,
 			ExpirationDate: time.Now().UTC().Add(15 * time.Minute),
 			BelongsTo: uuid,
