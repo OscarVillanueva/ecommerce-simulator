@@ -249,9 +249,17 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
-		token, err := tools.GenerateJWT(time.Now().UTC().Add(120 * time.Hour), map[string]any{ "uuid": user.Uuid, "name": user.Name })
+		token, err := tools.GenerateJWT(
+			time.Now().UTC().Add(120 * time.Hour), 
+			map[string]any{ "uuid": user.Uuid, "name": user.Name })
 
 		if err != nil {
+			log.Error(err)
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
+		if err := db.DeleteMagicLink(user.Uuid, r.Context()); err != nil {
 			log.Error(err)
 			tools.InternalServerErrorHandler(w, nil)
 			return
