@@ -193,7 +193,7 @@ func AuthRouter(router chi.Router) {
 		var magic dao.Magic
 		if err := db.RegenerateMagicLink(r.Context(), user.Uuid, &magic); err != nil {
 			tools.InternalServerErrorHandler(w, nil)
-			return nil
+			return
 		}
 
 		to := []string{resend.Email}
@@ -213,14 +213,56 @@ func AuthRouter(router chi.Router) {
 		resp.WriteMessage(w)
 	})
 
-	router.Get("/login", func(w http.ResponseWriter, r *http.Request){
-		
+	router.Post("/login", func(w http.ResponseWriter, r *http.Request){		
 		w.Header().Set("Content-Type", "application/json")
-  	err := json.NewEncoder(w).Encode("auth get")
+
+		var login requests.Login
+		if err := json.NewDecoder(r.Body).Decode(&login); err != nil {
+			log.Error(err)
+			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
+			return
+		}
+
+		var user dao.User
+		if err := db.FetchUser(login.Email, &user, r.Context()); err != nil {
+			msg := "The email or token are invalid"
+			tools.UnauthorizedErrorHandler(w, &msg)
+			return
+		}
+
+		if !user.Verified {
+			msg := "The email or token are invalid"
+			tools.UnauthorizedErrorHandler(w, &msg)
+			return
+		}
+
+		var magic dao.Magic
+		if err := db.FetchMagicLink(user.Uuid, &magic, r.Context()); err != nil {
+			msg := "The email or token are invalid"
+			tools.UnauthorizedErrorHandler(w, &msg)
+			return
+		}
+
+		if magic.ExpirationDate.Before(time.Now().UTC()) {
+			msg := "The email or token are invalid"
+			tools.UnauthorizedErrorHandler(w, &msg)
+			return
+		}
+
+		token, err := tools.GenerateJWT(time.Now().UTC().Add(120 * time.Hour), map[string]any{ "uuid": user.Uuid, "name": user.Name })
 
 		if err != nil {
 			log.Error(err)
+			tools.InternalServerErrorHandler(w, nil)
+			return
 		}
+
+		resp := tools.Message {
+			Message: token,
+			Data: "success",
+		}
+
+		resp.WriteMessage(w)
 	})
 }
 
