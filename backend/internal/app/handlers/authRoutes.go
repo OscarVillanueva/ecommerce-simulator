@@ -237,7 +237,7 @@ func AuthRouter(router chi.Router) {
 		}
 
 		var magic dao.Magic
-		if err := db.FetchMagicLink(user.Uuid, &magic, r.Context()); err != nil {
+		if err := db.FetchMagicLink(user.Uuid, login.Token, &magic, r.Context()); err != nil {
 			msg := "The email or token are invalid"
 			tools.UnauthorizedErrorHandler(w, &msg)
 			return
@@ -261,8 +261,6 @@ func AuthRouter(router chi.Router) {
 
 		if err := db.DeleteMagicLink(user.Uuid, r.Context()); err != nil {
 			log.Error(err)
-			tools.InternalServerErrorHandler(w, nil)
-			return
 		}
 
 		resp := tools.Message {

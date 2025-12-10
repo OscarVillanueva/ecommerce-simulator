@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func FetchMagicLink(userUuid string, magic *dao.Magic, ctx context.Context) error {
+func FetchMagicLink(userUuid string, token string, magic *dao.Magic, ctx context.Context) error {
 	db := platform.GetInstance()
 
 	if db == nil {
@@ -19,7 +19,7 @@ func FetchMagicLink(userUuid string, magic *dao.Magic, ctx context.Context) erro
 		return errors.New("We couldn't connect to the database")
 	}
 
-	if err := db.WithContext(ctx).Where("belongs_to = ?", userUuid).First(magic).Error; err != nil {
+	if err := db.WithContext(ctx).Where("token = ? AND belongs_to = ?", token, userUuid).First(magic).Error; err != nil {
 		return err
 	}
 
