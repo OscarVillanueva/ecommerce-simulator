@@ -7,7 +7,6 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/golang-jwt/jwt/v5"
-	log "github.com/sirupsen/logrus"
 )
 
 const JWT_KEY = "PRIVATE_JWT_KEY"
@@ -38,8 +37,6 @@ func GenerateJWT(expirationDate time.Time, data map[string]any) (string, error) 
 		}
 
 		_ = updateEnvFile(VERIFY_KEY, result.Public)
-
-		log.Info("public: \n", result.Public)
 
 		private = result.Sign
 	}
