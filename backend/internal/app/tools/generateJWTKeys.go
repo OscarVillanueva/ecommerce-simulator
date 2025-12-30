@@ -10,6 +10,7 @@ import (
 
 type JWTKeys struct {
 	Sign *ecdsa.PrivateKey
+	Verify *ecdsa.PublicKey
 	Private string
 	Public string
 }
@@ -33,6 +34,7 @@ func generateJWTKeys() (*JWTKeys, error)  {
 
 	result := JWTKeys{
 		Sign: privateKey,
+		Verify: publicKey,
 		Private: privateKeyString,
 		Public: publicKeyString,
 	}

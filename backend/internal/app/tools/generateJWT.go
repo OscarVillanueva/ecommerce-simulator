@@ -1,44 +1,46 @@
 package tools
 
 import (
-	"os"
+	"errors"
+	"sync"
 	"time"
 	"crypto/ecdsa"
 
-	"github.com/joho/godotenv"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const JWT_KEY = "PRIVATE_JWT_KEY"
-const VERIFY_KEY = "PUBLIC_JWT_KEY"
+
+type JWTKeyManager struct {
+	PrivateKey *ecdsa.PrivateKey
+	PublicKey *ecdsa.PublicKey
+}
+
+var (
+	instance *JWTKeyManager
+	once sync.Once
+)
+
+func getKeyManager() *JWTKeyManager  {
+	once.Do(func() {
+		instance = &JWTKeyManager{}
+		instance.initialize()
+	})
+
+	return instance
+}
+
+func (manager *JWTKeyManager) initialize()  {
+	if result, err := generateJWTKeys(); err == nil {
+		manager.PublicKey = result.Verify
+		manager.PrivateKey = result.Sign
+	}
+}
 
 func GenerateJWT(expirationDate time.Time, data map[string]any) (string, error) {
-	if err := godotenv.Load(); err != nil {
-		return "", err
-	}
+	manager := getKeyManager()
 
-	var private *ecdsa.PrivateKey
-	key := os.Getenv(JWT_KEY)
-
-	if key != "" {
-		pem, err := parsePrivatePemToKey(key)
-		if err != nil { return "", err }
-
-		private = pem
-	} else {
-		
-		result, err := generateJWTKeys()
-		if err != nil {
-			return "", err
-		}
-
-		if err := updateEnvFile(JWT_KEY, result.Private); err != nil {
-			return "", err
-		}
-
-		_ = updateEnvFile(VERIFY_KEY, result.Public)
-
-		private = result.Sign
+	if manager.PrivateKey == nil {
+		return "", errors.New("We couldn't sing the token")
 	}
 
 	token := jwt.NewWithClaims(
@@ -48,5 +50,5 @@ func GenerateJWT(expirationDate time.Time, data map[string]any) (string, error) 
 			"expiration_date": expirationDate.String(),
 		})
 
-	return token.SignedString(private)
+	return token.SignedString(manager.PrivateKey)
 }
