@@ -47,7 +47,7 @@ func GenerateJWT(expirationDate time.Time, data map[string]any) (string, error) 
 		jwt.SigningMethodES256,
 		jwt.MapClaims {
 			"data": data,
-			"expiration_date": expirationDate.String(),
+			"exp": expirationDate.Unix(),
 		})
 
 	return token.SignedString(manager.PrivateKey)
