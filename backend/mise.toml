@@ -9,6 +9,10 @@ run = "go mod tidy"
 description = "Build the go api"
 run = "go run cmd/api/main.go"
 
+[tasks.compile]
+description = "Compile the app to check errors"
+run = "go build cmd/api/main.go"
+
 [tasks.rebuild]
 description = "Rebuild backend service in docker"
 run = "docker compose up -d --build backend"
