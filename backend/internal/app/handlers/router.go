@@ -16,6 +16,8 @@ func Router(r *chi.Mux) {
 	r.Use(chimiddle.StripSlashes)
 
 	r.Route("/", AuthRouter)
+	
+	r.Route("/product", ProductsRouter)
 
 	r.Route("/ping", func(router chi.Router){
 		router.Get("/", func(w http.ResponseWriter, r *http.Request) {

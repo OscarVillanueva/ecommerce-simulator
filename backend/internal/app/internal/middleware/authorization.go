@@ -2,9 +2,11 @@ package middleware
 
 import (
 	"context"
+	"strings"
 	"net/http"
 
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
+	log "github.com/sirupsen/logrus"
 )
 
 // Define a complex string key to avoid collitions in the context
@@ -27,9 +29,16 @@ func Authorization(next http.Handler) http.Handler {
 			return
 		}
 
-		uuid, ok := claims["uuid"].(string)
+		data, ok := claims["data"].(map[string]any)
 		if !ok {
 			tools.UnauthorizedErrorHandler(w)
+			return
+		}
+
+		uuid, ok := data["uuid"].(string)
+		if !ok {
+			msg := "Missing context"
+			tools.UnauthorizedErrorHandler(w, &msg)
 			return
 		}
 
