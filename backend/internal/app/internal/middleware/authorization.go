@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
-	log "github.com/sirupsen/logrus"
 )
 
 // Define a complex string key to avoid collitions in the context
@@ -19,26 +18,25 @@ func Authorization(next http.Handler) http.Handler {
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			tools.UnauthorizedErrorHandler(w)
+			tools.UnauthorizedErrorHandler(w, nil)
 			return
 		}
 
 		claims, err := tools.IsValidToken(parts[1])
 		if err != nil {
-			tools.UnauthorizedErrorHandler(w)
+			tools.UnauthorizedErrorHandler(w, nil)
 			return
 		}
 
 		data, ok := claims["data"].(map[string]any)
 		if !ok {
-			tools.UnauthorizedErrorHandler(w)
+			tools.UnauthorizedErrorHandler(w, nil)
 			return
 		}
 
 		uuid, ok := data["uuid"].(string)
 		if !ok {
-			msg := "Missing context"
-			tools.UnauthorizedErrorHandler(w, &msg)
+			tools.UnauthorizedErrorHandler(w, nil)
 			return
 		}
 

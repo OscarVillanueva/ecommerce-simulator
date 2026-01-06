@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"fmt"
 	"encoding/json"
 
 	"github.com/OscarVillanueva/goapi/internal/app/internal/middleware"
@@ -14,7 +15,9 @@ func ProductsRouter(router chi.Router)  {
 	router.Post("/", func (w http.ResponseWriter, r *http.Request)  {
 		w.Header().Set("Content-Type", "application/json")
 
-		json.NewEncoder(w).Encode("products ping")
+		uuid := r.Context().Value(middleware.UserUUIDKey)
+
+		json.NewEncoder(w).Encode(fmt.Sprintf("products ping: %s", uuid))
 	})
 }
 
