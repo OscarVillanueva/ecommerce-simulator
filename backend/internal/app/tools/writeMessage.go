@@ -7,7 +7,7 @@ import (
 
 type Message struct {
 	Message string `json:"message"`
-	Data string `json:"data"`
+	Data any `json:"data"`
 }
 
 type Interactions interface {
