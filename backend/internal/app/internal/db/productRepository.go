@@ -38,4 +38,22 @@ func InsertProduct(product *requests.CreateProduct, belongTo string, ctx context
 	return &p, nil
 }
 
+func DeleteProduct(uuid string, user string, ctx context.Context) error  {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return errors.New("We couldn't connect to the database")
+	}
+
+	result := db.WithContext(ctx).Where("uuid = (?) AND belongs_to = (?)", uuid, user).Delete(&dao.Product{})
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("Record Not found")
+	}
+
+	return nil
+}
 
