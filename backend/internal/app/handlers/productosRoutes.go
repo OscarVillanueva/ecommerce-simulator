@@ -21,15 +21,21 @@ func ProductsRouter(router chi.Router)  {
 		w.Header().Set("Content-Type", "application/json")
 
 		uuid, ok := r.Context().Value(middleware.UserUUIDKey).(string)
-		if !ok {
+		if !ok || uuid == ""{
 			tools.UnauthorizedErrorHandler(w, nil)
 			return
 		}
 
-		product := requests.CreateProduct{}
+		var product requests.CreateProduct
 		if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
 			log.Error(err)
 			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
+			return
+		}
+
+		if err := product.Validate(); err != nil {
+			log.Error(err)
+			tools.BadRequestErrorHandler(w, err)
 			return
 		}
 
