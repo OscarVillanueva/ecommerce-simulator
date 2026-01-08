@@ -50,4 +50,7 @@ var (
 
 		writeError(w, msg, http.StatusUnauthorized)
 	}
+	NotFoundErrorHandler = func(w http.ResponseWriter, message string) {
+		writeError(w, message, http.StatusNotFound)
+	}
 )
