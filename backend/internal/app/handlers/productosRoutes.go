@@ -113,13 +113,12 @@ func ProductsRouter(router chi.Router)  {
 		}
 
 		if err := product.Validate(); err != nil {
-			log.Error(err)
 			tools.BadRequestErrorHandler(w, err)
 			return
 		}
 
 		if err := db.UpdateProduct(productID, &product, userID, r.Context()); err != nil {
-			if err.Error() == "Record Not found" {
+			if errors.Is(err, db.ErrProductNotFound){
 				tools.NotFoundErrorHandler(w, "Product not found")
 				return
 			}
