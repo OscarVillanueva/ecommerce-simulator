@@ -17,7 +17,7 @@ func Router(r *chi.Mux) {
 
 	r.Route("/", AuthRouter)
 	
-	r.Route("/product", ProductsRouter)
+	r.Route("/products", ProductsRouter)
 
 	r.Route("/ping", func(router chi.Router){
 		router.Get("/", func(w http.ResponseWriter, r *http.Request) {
