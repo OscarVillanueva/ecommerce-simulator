@@ -13,6 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrProductNotFound = errors.New("Product Not Found")
+
 func InsertProduct(product *requests.CreateProduct, belongTo string, ctx context.Context) (*dao.Product, error) {
 	db := platform.GetInstance()
 
@@ -51,7 +53,7 @@ func DeleteProduct(uuid string, user string, ctx context.Context) error  {
 	}
 
 	if result.RowsAffected == 0 {
-		return errors.New("Record Not found")
+		return ErrProductNotFound
 	}
 
 	return nil
@@ -64,14 +66,14 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 		return errors.New("We couldn't connect to the database")
 	}
 
-	updatedProduct := dao.Product{
-		Name: product.Name,
-		Price: product.Price,
-		Quantity: product.Quantity,
-		BelongsTo: belongTo,
+	updatedProduct := map[string]interface{}{
+		"name": product.Name,
+		"price": product.Price,
+		"quantity": product.Quantity,
+		"updated_at": time.Now().UTC(),
 	}
 
-	result := db.Model(&updatedProduct).
+	result := db.Model(&dao.Product{}).
 		WithContext(ctx).
 		Where("uuid = (?) AND belongs_to = (?)", productID, belongTo).
 		Updates(updatedProduct)
@@ -81,7 +83,7 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 	}
 
 	if result.RowsAffected == 0 {
-		return errors.New("Record Not found")
+		return ErrProductNotFound
 	}
 
 	return nil
