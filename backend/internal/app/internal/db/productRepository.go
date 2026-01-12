@@ -57,3 +57,33 @@ func DeleteProduct(uuid string, user string, ctx context.Context) error  {
 	return nil
 }
 
+func UpdateProduct(productID string, product *requests.CreateProduct, belongTo string, ctx context.Context) error  {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return errors.New("We couldn't connect to the database")
+	}
+
+	updatedProduct := dao.Product{
+		Name: product.Name,
+		Price: product.Price,
+		Quantity: product.Quantity,
+		BelongsTo: belongTo,
+	}
+
+	result := db.Model(&updatedProduct).
+		WithContext(ctx).
+		Where("uuid = (?) AND belongs_to = (?)", productID, belongTo).
+		Updates(updatedProduct)
+	
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("Record Not found")
+	}
+
+	return nil
+}
+
