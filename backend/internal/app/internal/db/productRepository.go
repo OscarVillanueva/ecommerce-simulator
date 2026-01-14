@@ -89,3 +89,17 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 	return nil
 }
 
+func GetProducts(user string, ctx context.Context) (*[]dao.Product, error) {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return nil, errors.New("We couldn't connect to the database")
+	}
+	
+	var products []dao.Product
+	if err := db.WithContext(ctx).Where("belongs_to = (?)", user).Find(&products).Error; err != nil {
+		return nil, err
+	}
+
+	return &products, nil
+}

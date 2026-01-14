@@ -18,6 +18,30 @@ import (
 func ProductsRouter(router chi.Router)  {
 	router.Use(middleware.Authorization)
 
+	router.Get("/", func (w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		userID, ok := r.Context().Value(middleware.UserUUIDKey).(string)
+		if !ok || userID == ""{
+			tools.UnauthorizedErrorHandler(w, nil)
+			return
+		}
+
+		products, err := db.GetProducts(userID, r.Context())
+		if err != nil {
+			log.Error(err)
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
+		resp := tools.Message {
+			Message: "Products",
+			Data: products,
+		}
+
+		resp.WriteMessage(w)
+	})
+
 	router.Post("/", func (w http.ResponseWriter, r *http.Request)  {
 		w.Header().Set("Content-Type", "application/json")
 

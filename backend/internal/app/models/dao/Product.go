@@ -3,12 +3,12 @@ package dao
 import "time"
 
 type Product struct {
-	Uuid string
-	Name string
-	Price float32
-	Quantity int32
-	Image *string
-	BelongsTo string
-	CreatedAt time.Time
-	UpdatedAt *time.Time
+	Uuid string `json:"uuid"`
+	Name string `json:"name"`
+	Price float32 `json:"price"`
+	Quantity int32 `json:"quantity"`
+	Image *string `json:"image"`
+	BelongsTo string `json:"belongs_to"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
 }
