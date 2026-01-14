@@ -89,17 +89,23 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 	return nil
 }
 
-func GetProducts(user string, ctx context.Context) (*[]dao.Product, error) {
+func GetProducts(user string, page int, ctx context.Context) ([]dao.Product, error) {
 	db := platform.GetInstance()
 
 	if db == nil {
 		return nil, errors.New("We couldn't connect to the database")
 	}
 	
-	var products []dao.Product
-	if err := db.WithContext(ctx).Where("belongs_to = (?)", user).Find(&products).Error; err != nil {
-		return nil, err
-	}
+	limit := 30
+	offset := (page - 1) * limit
 
-	return &products, nil
+	products := make([]dao.Product, 0)
+	err := db.WithContext(ctx).
+		Where("belongs_to = (?)", user).
+		Find(&products).
+		Limit(limit).
+		Offset(offset).
+		Find(&products).Error
+
+	return products, err
 }

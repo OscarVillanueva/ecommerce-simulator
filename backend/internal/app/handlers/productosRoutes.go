@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"strings"
+	"strconv"
 	"net/http"
 	"encoding/json"
 
@@ -20,6 +21,7 @@ func ProductsRouter(router chi.Router)  {
 
 	router.Get("/", func (w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		page := 1
 
 		userID, ok := r.Context().Value(middleware.UserUUIDKey).(string)
 		if !ok || userID == ""{
@@ -27,7 +29,19 @@ func ProductsRouter(router chi.Router)  {
 			return
 		}
 
-		products, err := db.GetProducts(userID, r.Context())
+		pageStr := r.URL.Query().Get("page")
+		if pageStr != "" {
+			parsedPage, err := strconv.Atoi(pageStr)
+
+			if err != nil || parsedPage <= 0 {
+				tools.BadRequestErrorHandler(w, errors.New("Invalid Page number"))
+				return
+			}
+
+			page = parsedPage
+		}
+
+		products, err := db.GetProducts(userID, page, r.Context())
 		if err != nil {
 			log.Error(err)
 			tools.InternalServerErrorHandler(w, nil)
