@@ -38,6 +38,22 @@ services:
       traefik.http.routers.mailhog.rule: Host(`email.localhost`)
       traefik.http.services.mailhog.loadbalancer.server.port: 8025
 
+  bucket:
+    container_name: ecommerce-bucket
+    image: quay.io/minio/minio
+    command: server /data --console-address ":9001"
+    env_file:
+      - ./.env
+    volumes:
+      - bucket_storage:/data
+    labels:
+      traefik.http.routers.bucket.rule: Host(`bucket.localhost`)
+      traefik.http.routers.bucket.service: bucket-service
+      traefik.http.services.bucket-service.loadbalancer.server.port: 9001
+      traefik.http.routers.minio-api.rule: Host(`images.localhost`)
+      traefik.http.routers.minio-api.service: minio-api-svc
+      traefik.http.services.minio-api-svc.loadbalancer.server.port: 9000
+
   backend:
     container_name: go-ecommerce-api
     env_file:
@@ -58,3 +74,4 @@ services:
 
 volumes:
   ecommerce-mysql-data:
+  bucket_storage:
