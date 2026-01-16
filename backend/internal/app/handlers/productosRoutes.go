@@ -6,12 +6,15 @@ import (
 	"strconv"
 	"net/http"
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/OscarVillanueva/goapi/internal/app/internal/middleware"
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
 	"github.com/OscarVillanueva/goapi/internal/app/internal/db"
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
+	"github.com/OscarVillanueva/goapi/internal/platform"
 	
+	"github.com/google/uuid"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 )
@@ -173,7 +176,40 @@ func ProductsRouter(router chi.Router)  {
 		}
 
 		resp.WriteMessage(w)
+	})
 
+	router.Put("/{product}/image", func (w http.ResponseWriter, r *http.Request)  {
+		w.Header().Set("Content-Type", "application/json")
+
+		// << 20 is a short of 2^20 -> 5 * 1MB
+		r.ParseMultipartForm(5 << 20)
+
+		file, handler, err := r.FormFile("image")
+
+		if err != nil {
+			tools.BadRequestErrorHandler(w, errors.New("We couldn't get the image"))
+			return
+		}
+
+		defer file.Close()
+		
+		ext := filepath.Ext(handler.Filename)
+		objectName := uuid.New().String() + ext
+		contentType := handler.Header.Get("Content-Type")
+
+		path, putErr := platform.PutImage(objectName, file, handler.Size, contentType, r.Context())
+		if putErr != nil {
+			msg := "We couldn't save your image"
+			tools.InternalServerErrorHandler(w, &msg)
+			return
+		}
+
+		resp := tools.Message {
+			Message: "The image was saved successfully",
+			Data: path,
+		}
+
+		resp.WriteMessage(w)
 	})
 }
 
