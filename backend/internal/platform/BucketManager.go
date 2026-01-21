@@ -2,9 +2,11 @@ package platform
 
 import (
 	"os"
+	"errors"
 	"context"
 	"io"
 	"fmt"
+	"sync"
 
 	"github.com/joho/godotenv"
 	"github.com/minio/minio-go/v7"
@@ -12,49 +14,73 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const BUCKET_NAME = "ecommerce-image"
-const IMAGES_HOST = "images.localhost"
+var (
+	minioClient *minio.Client
+	minioOnce sync.Once
+	bucketName string
+	imagesHost string
+)
 
-func GetBucketClient() (*minio.Client, error)  {
-	err := godotenv.Load()
 
+func ensureBucketExists() {
+	ctx := context.Background()
+
+	exists, err := minioClient.BucketExists(ctx, bucketName)
 	if err != nil {
-		log.Warning("Could't load env: ", err)
-		return nil, err
+		log.Error("Failed to check bucket status:", err)
 	}
-	
-	endpoint := os.Getenv("MINIO_HOST")
-	accessKey := os.Getenv("MINIO_ROOT_USER")
-	secretKey := os.Getenv("MINIO_ROOT_PASSWORD")
-	useSSL := false
+	if !exists {
+		err = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+		if err != nil {
+			log.Error("Failed to create bucket:", err)
+		}
+		// Set policy to public read (simplification)
+		policy := `{"Version": "2012-10-17","Statement": [{"Action": ["s3:GetObject"],"Effect": "Allow","Principal": {"AWS": ["*"]},"Resource": ["arn:aws:s3:::` + bucketName + `/*"]}]}`
+		minioClient.SetBucketPolicy(ctx, bucketName, policy)
+	}
+}
 
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds: credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: useSSL,
+func getBucketClient() *minio.Client  {
+	minioOnce.Do(func () {
+		err := godotenv.Load()
+
+		if err != nil {
+			log.Warning("Could't load env: ", err)
+			return
+		}
+		
+		endpoint := os.Getenv("MINIO_HOST")
+		accessKey := os.Getenv("MINIO_ROOT_USER")
+		secretKey := os.Getenv("MINIO_ROOT_PASSWORD")
+		bucketName = os.Getenv("MINIO_BUCKET_NAME")
+		imagesHost = os.Getenv("IMAGES_HOST")
+		useSSL := false
+
+		minioClient, err = minio.New(endpoint, &minio.Options{
+			Creds: credentials.NewStaticV4(accessKey, secretKey, ""),
+			Secure: useSSL,
+		})
+
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		ensureBucketExists()
 	})
 
-	if err != nil {
-		log.Error()
-	}
-
-	return minioClient, err
+	return minioClient
 }
 
 func PutImage(imageName string, file io.Reader, size int64, contentType string, ctx context.Context) (string, error) {
-	client, err := GetBucketClient()
+	client := getBucketClient()
 
-	if err != nil {
-		return "", err
-	}
-
-	if exists, _ := client.BucketExists(ctx, BUCKET_NAME); !exists {
-		client.MakeBucket(ctx, BUCKET_NAME, minio.MakeBucketOptions{})
-		policy := `{"Version": "2012-10-17","Statement": [{"Action": ["s3:GetObject"],"Effect": "Allow","Principal": {"AWS": ["*"]},"Resource": ["arn:aws:s3:::` + BUCKET_NAME + `/*"]}]}`
-		client.SetBucketPolicy(ctx, BUCKET_NAME, policy)
+	if client == nil {
+		return "", errors.New("We couldn't connect to the bucket")
 	}
 
 	_, putError := client.PutObject(ctx,
-		BUCKET_NAME,
+		bucketName,
 		imageName,
 		file,
 		size,
@@ -63,9 +89,9 @@ func PutImage(imageName string, file io.Reader, size int64, contentType string, 
 		})
 
 	if putError != nil {
-		return "", err
+		return "", putError
 	}
 
-	imageURL := fmt.Sprintf("%s/%s/%s", IMAGES_HOST, BUCKET_NAME, imageName)
+	imageURL := fmt.Sprintf("%s/%s/%s", imagesHost, bucketName, imageName)
 	return imageURL, nil
 }

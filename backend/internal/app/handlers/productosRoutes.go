@@ -215,9 +215,14 @@ func ProductsRouter(router chi.Router)  {
 
 		defer file.Close()
 		
+		contentType := handler.Header.Get("Content-Type")
+		if contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp" {
+			tools.BadRequestErrorHandler(w, errors.New("Only jpeg, png, and webp images are allowed"))
+			return
+		}
+
 		ext := filepath.Ext(handler.Filename)
 		objectName := productID + ext
-		contentType := handler.Header.Get("Content-Type")
 
 		path, putErr := platform.PutImage(objectName, file, handler.Size, contentType, r.Context())
 		if putErr != nil {
