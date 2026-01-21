@@ -109,3 +109,48 @@ func GetProducts(user string, page int, ctx context.Context) ([]dao.Product, err
 
 	return products, err
 }
+
+func GetProduct(user string, productId string, ctx context.Context) (*dao.Product, error) {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return nil, errors.New("We couldn't connect to the database")
+	}
+	
+	var product dao.Product
+	err := db.WithContext(ctx).Where("belongs_to = (?) AND uuid = (?)", user, productId).First(&product).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrProductNotFound
+	}
+
+	return &product, err
+}
+
+func UpdateProductImage(productID string, path string, userID string, ctx context.Context) error {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return errors.New("We couldn't connect to the database")
+	}
+
+	updatedProduct := map[string]interface{}{
+		"image": path,
+	}
+
+	result := db.Model(&dao.Product{}).
+		WithContext(ctx).
+		Where("uuid = (?) AND belongs_to = (?)", productID, userID).
+		Updates(updatedProduct)
+	
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return ErrProductNotFound
+	}
+
+	return nil
+}
+

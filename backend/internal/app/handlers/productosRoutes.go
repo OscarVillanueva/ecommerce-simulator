@@ -14,7 +14,6 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 	
-	"github.com/google/uuid"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 )
@@ -181,11 +180,34 @@ func ProductsRouter(router chi.Router)  {
 	router.Put("/{product}/image", func (w http.ResponseWriter, r *http.Request)  {
 		w.Header().Set("Content-Type", "application/json")
 
+		userID, ok := r.Context().Value(middleware.UserUUIDKey).(string)
+		if !ok || userID == ""{
+			tools.UnauthorizedErrorHandler(w, nil)
+			return
+		}
+
+		productID := chi.URLParam(r, "product")
+		if strings.TrimSpace(productID) == "" {
+			tools.BadRequestErrorHandler(w, errors.New("Invalid product id"))
+			return
+		}
+
+		_, err := db.GetProduct(userID, productID, r.Context())
+		if err != nil {
+			if errors.Is(err, db.ErrProductNotFound){
+				tools.NotFoundErrorHandler(w, "Product not found")
+				return
+			}
+
+			log.Error("Failed to delete product: ", err)
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
 		// << 20 is a short of 2^20 -> 5 * 1MB
 		r.ParseMultipartForm(5 << 20)
 
 		file, handler, err := r.FormFile("image")
-
 		if err != nil {
 			tools.BadRequestErrorHandler(w, errors.New("We couldn't get the image"))
 			return
@@ -194,13 +216,25 @@ func ProductsRouter(router chi.Router)  {
 		defer file.Close()
 		
 		ext := filepath.Ext(handler.Filename)
-		objectName := uuid.New().String() + ext
+		objectName := productID + ext
 		contentType := handler.Header.Get("Content-Type")
 
 		path, putErr := platform.PutImage(objectName, file, handler.Size, contentType, r.Context())
 		if putErr != nil {
 			msg := "We couldn't save your image"
 			tools.InternalServerErrorHandler(w, &msg)
+			return
+		}
+
+		if updateErr := db.UpdateProductImage(productID, path, userID, r.Context()); updateErr != nil {
+			if errors.Is(updateErr, db.ErrProductNotFound){
+				tools.NotFoundErrorHandler(w, "Product not found")
+				return
+			}
+
+			// Real DB error
+			log.Error("Failed to update the product: ", updateErr)
+			tools.InternalServerErrorHandler(w, nil)
 			return
 		}
 

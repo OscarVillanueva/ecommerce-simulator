@@ -12,7 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const BUCKET_NAME = "ecommerce-images"
+const BUCKET_NAME = "ecommerce-image"
+const IMAGES_HOST = "images.localhost"
 
 func GetBucketClient() (*minio.Client, error)  {
 	err := godotenv.Load()
@@ -65,6 +66,6 @@ func PutImage(imageName string, file io.Reader, size int64, contentType string, 
 		return "", err
 	}
 
-	imageURL := fmt.Sprintf("%s/%s", BUCKET_NAME, imageName)
+	imageURL := fmt.Sprintf("%s/%s/%s", IMAGES_HOST, BUCKET_NAME, imageName)
 	return imageURL, nil
 }
