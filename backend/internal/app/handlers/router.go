@@ -19,6 +19,8 @@ func Router(r *chi.Mux) {
 	
 	r.Route("/products", ProductsRouter)
 
+	r.Route("/purchase", PurchaseRouter)
+
 	r.Route("/ping", func(router chi.Router){
 		router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			response := struct {
