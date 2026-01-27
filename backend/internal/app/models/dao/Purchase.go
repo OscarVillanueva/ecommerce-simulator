@@ -4,6 +4,7 @@ import "time"
 
 type Purchase struct {
 	Uuid string
+	TicketId string
 	Product string
 	Quantity int32
 	Price float32

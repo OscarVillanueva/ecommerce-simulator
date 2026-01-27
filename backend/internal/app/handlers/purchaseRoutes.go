@@ -26,20 +26,26 @@ func PurchaseRouter(router chi.Router)  {
 			return
 		}
 
-		ticket := make([]requests.CreatePurchase, 0)
+		var ticket []requests.CreatePurchase
 		if err := json.NewDecoder(r.Body).Decode(&ticket); err != nil {
 			log.Error(err)
 			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
 			return
 		}
 
-		purchaseID, err := db.BatchPurchase(&ticket, userID, r.Context())
+		purchaseID, err := db.BatchPurchase(ticket, userID, r.Context())
 
 		if err != nil {
 			log.Error(err)
 			var stockErr *db.ErrInsufficientStock
 			if errors.As(err, &stockErr) {
 				tools.BadRequestErrorHandler(w, errors.New(stockErr.Error()))
+				return
+			}
+
+			if err.Error() == "quantity must be greater than zero" {
+				tools.BadRequestErrorHandler(w, err)
+				return
 			}
 
 			tools.InternalServerErrorHandler(w, nil)
