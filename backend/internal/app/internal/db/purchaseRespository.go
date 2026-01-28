@@ -23,7 +23,7 @@ func (e *ErrInsufficientStock) Error() string {
     return fmt.Sprintf("insufficient stock for %s", e.Product)
 }
 
-func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx context.Context,) (string, error) {
+func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx context.Context) (string, error) {
 	db := platform.GetInstance()
 
 	if db == nil {
@@ -79,4 +79,26 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 	})
 
 	return purchaseID, err
+}
+
+func FetchTickets(page int, ctx context.Context) (*[]dao.Ticket, error) {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return nil, errors.New("We couldn't connect to the database")
+	}
+
+	limit := 30
+	offset := (page - 1) * limit
+
+	var ticket []dao.Ticket
+	err := db.Model(&dao.Purchase{}).
+		Select("MAX(created_at) as created_at, SUM(price * quantity) as total, ticket_id").
+		Group("ticket_id").
+		Limit(limit).
+		Offset(offset).
+		Scan(&ticket).
+		Error
+
+	return &ticket, err
 }

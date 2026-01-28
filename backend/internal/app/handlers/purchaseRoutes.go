@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"strconv"
 	"net/http"
 	"encoding/json"
 
@@ -60,4 +61,34 @@ func PurchaseRouter(router chi.Router)  {
 		resp.WriteMessage(w)
 	})
 	
+	router.Get("/", func (w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		page := 1
+
+		pageStr := r.URL.Query().Get("page")
+		if pageStr != "" {
+			parsedPage, err := strconv.Atoi(pageStr)
+
+			if err != nil || parsedPage <= 0 {
+				tools.BadRequestErrorHandler(w, errors.New("Invalid Page number"))
+				return
+			}
+
+			page = parsedPage
+		}
+
+		tickets, err := db.FetchTickets(page, r.Context())
+		if err != nil {
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
+
+		resp := tools.Message {
+			Message: "List of tickets",
+			Data: tickets,
+		}
+
+		resp.WriteMessage(w)
+	})
 }
