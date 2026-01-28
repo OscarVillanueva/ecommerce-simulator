@@ -3,8 +3,8 @@ package db
 import (
 	"fmt"
 	"time"
-	"context"
 	"errors"
+	"context"
 
 	"github.com/OscarVillanueva/goapi/internal/platform"
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
@@ -81,7 +81,7 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 	return purchaseID, err
 }
 
-func FetchTickets(page int, ctx context.Context) (*[]dao.Ticket, error) {
+func FetchTickets(page int, buyer string, ctx context.Context) ([]dao.Ticket, error) {
 	db := platform.GetInstance()
 
 	if db == nil {
@@ -91,8 +91,10 @@ func FetchTickets(page int, ctx context.Context) (*[]dao.Ticket, error) {
 	limit := 30
 	offset := (page - 1) * limit
 
-	var ticket []dao.Ticket
+	ticket := make([]dao.Ticket, 0)
 	err := db.Model(&dao.Purchase{}).
+		WithContext(ctx).
+		Where("purchased_by = ?", buyer).
 		Select("MAX(created_at) as created_at, SUM(price * quantity) as total, ticket_id").
 		Group("ticket_id").
 		Limit(limit).
@@ -100,5 +102,22 @@ func FetchTickets(page int, ctx context.Context) (*[]dao.Ticket, error) {
 		Scan(&ticket).
 		Error
 
-	return &ticket, err
+	return ticket, err
+}
+
+func FetchPurchase(purchaseId string, buyer string, ctx context.Context) ([]dao.Purchase, error) {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return nil, errors.New("We couldn't connect to the database")
+	}
+
+	purchases := make([]dao.Purchase, 0)
+	err := db.Model(&dao.Purchase{}).
+		WithContext(ctx).
+		Where("ticket_id = ? AND purchased_by = ?", purchaseId, buyer).
+		Find(&purchases).
+		Error
+
+	return purchases, err
 }

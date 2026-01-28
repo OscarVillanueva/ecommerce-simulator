@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"net/http"
 	"encoding/json"
 
@@ -76,8 +77,14 @@ func PurchaseRouter(router chi.Router)  {
 
 			page = parsedPage
 		}
+		
+		userID, ok := r.Context().Value(middleware.UserUUIDKey).(string)
+		if !ok || userID == ""{
+			tools.UnauthorizedErrorHandler(w, nil)
+			return
+		}
 
-		tickets, err := db.FetchTickets(page, r.Context())
+		tickets, err := db.FetchTickets(page, userID, r.Context())
 		if err != nil {
 			tools.InternalServerErrorHandler(w, nil)
 			return
@@ -85,8 +92,42 @@ func PurchaseRouter(router chi.Router)  {
 
 
 		resp := tools.Message {
-			Message: "List of tickets",
+			Message: "List of purchases",
 			Data: tickets,
+		}
+
+		resp.WriteMessage(w)
+	})
+
+	router.Get("/{purchase}", func (w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		userID, ok := r.Context().Value(middleware.UserUUIDKey).(string)
+		if !ok || userID == ""{
+			tools.UnauthorizedErrorHandler(w, nil)
+			return
+		}
+
+		purchaseID := chi.URLParam(r, "purchase")
+		if strings.TrimSpace(purchaseID) == "" {
+			tools.BadRequestErrorHandler(w, errors.New("Invalid purchase id"))
+			return
+		}
+
+		purchases, err := db.FetchPurchase(purchaseID, userID, r.Context())
+		if err != nil {
+			tools.InternalServerErrorHandler(w, nil)
+			return
+		}
+
+		if len(purchases) == 0 {
+			tools.NotFoundErrorHandler(w, "Purchase not found")
+			return
+		}
+		
+		resp := tools.Message {
+			Message: "Purchase details",
+			Data: purchases,
 		}
 
 		resp.WriteMessage(w)
