@@ -121,3 +121,42 @@ func FetchPurchase(purchaseId string, buyer string, ctx context.Context) ([]dao.
 
 	return purchases, err
 }
+
+func DeletePurchase(purchases []dao.Purchase, ctx context.Context) error  {
+	db := platform.GetInstance()
+
+	if db == nil {
+		return errors.New("We couldn't connect to the database")
+	}
+
+	err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, purchase := range purchases {
+			var product dao.Product
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("uuid = ?", purchase.Product).First(&product).Error; err != nil {
+				return err
+			}
+
+			quantity := product.Quantity + purchase.Quantity
+
+			updatedProduct := map[string]interface{}{
+				"quantity": quantity,
+				"updated_at": time.Now().UTC(),
+			}
+
+			result := tx.Model(&product).Where("uuid = ?", product.Uuid).Updates(updatedProduct)
+			if result.Error != nil {
+				return result.Error
+			}
+
+			err := tx.Where("uuid = ? AND ticket_id = ?", purchase.Uuid, purchase.TicketId).Delete(&purchase).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return err
+}
