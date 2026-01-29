@@ -1,8 +1,9 @@
 package db
 
 import (
-	"errors"
 	"time"
+	"math"
+	"errors"
 	"context"
 
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
@@ -89,7 +90,7 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 	return nil
 }
 
-func GetProducts(user string, page int, ctx context.Context) ([]dao.Product, error) {
+func GetProducts(user string, page int, ctx context.Context) (*requests.ProductsResponse, error) {
 	db := platform.GetInstance()
 
 	if db == nil {
@@ -107,7 +108,19 @@ func GetProducts(user string, page int, ctx context.Context) ([]dao.Product, err
 		Offset(offset).
 		Find(&products).Error
 
-	return products, err
+	var count int
+	countErr:= db.Model(&dao.Product{}).WithContext(ctx).Select("COUNT(*)").Scan(&count).Error
+	if countErr != nil {
+		count = 1
+	}
+
+	response := requests.ProductsResponse {
+		Products: products,
+		PageSize: limit,
+		Pages: int(math.Ceil(float64(count) / float64(limit))),
+	}
+
+	return &response, err
 }
 
 func GetProduct(user string, productId string, ctx context.Context) (*dao.Product, error) {
