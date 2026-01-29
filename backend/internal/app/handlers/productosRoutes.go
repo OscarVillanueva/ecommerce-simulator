@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/OscarVillanueva/goapi/internal/app/internal/middleware"
+	"github.com/OscarVillanueva/goapi/internal/app/models/parameters"
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
 	"github.com/OscarVillanueva/goapi/internal/app/internal/db"
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
@@ -24,6 +25,7 @@ func ProductsRouter(router chi.Router)  {
 	router.Get("/", func (w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		page := 1
+		onlyAvailable := false
 
 		userID, ok := r.Context().Value(middleware.UserUUIDKey).(string)
 		if !ok || userID == ""{
@@ -43,7 +45,27 @@ func ProductsRouter(router chi.Router)  {
 			page = parsedPage
 		}
 
-		products, err := db.GetProducts(userID, page, r.Context())
+		availableStr := r.URL.Query().Get("available")
+		if availableStr != "" {
+			parsedAvailable, err := strconv.ParseBool(availableStr)
+
+			if err != nil {
+				tools.BadRequestErrorHandler(w, errors.New("Invalid available value"))
+				return
+			}
+
+			onlyAvailable = parsedAvailable
+		}
+
+		search := r.URL.Query().Get("search")
+
+		products, err := db.GetProducts(parameters.GetProductsParams{
+			User: userID,
+			Page: page,
+			Context: r.Context(),
+			OnlyAvailable: onlyAvailable,
+			SearchName: search,
+		})
 		if err != nil {
 			log.Error(err)
 			tools.InternalServerErrorHandler(w, nil)

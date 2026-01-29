@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
+	"github.com/OscarVillanueva/goapi/internal/app/models/parameters"
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
@@ -90,7 +91,7 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 	return nil
 }
 
-func GetProducts(user string, page int, ctx context.Context) (*requests.ProductsResponse, error) {
+func GetProducts(params parameters.GetProductsParams) (*requests.ProductsResponse, error) {
 	db := platform.GetInstance()
 
 	if db == nil {
@@ -98,18 +99,24 @@ func GetProducts(user string, page int, ctx context.Context) (*requests.Products
 	}
 	
 	limit := 30
-	offset := (page - 1) * limit
+	offset := (params.Page - 1) * limit
+
+	query := db.WithContext(params.Context).Model(&dao.Product{}).Where("belongs_to = (?)", params.User)
+
+	if params.OnlyAvailable {
+		query = query.Where("quantity > 0")
+	}
+
+	if params.SearchName != "" {
+		fullSearch := "%" + params.SearchName + "%"
+    query = query.Where("name LIKE ?", fullSearch)
+	}
 
 	products := make([]dao.Product, 0)
-	err := db.WithContext(ctx).
-		Where("belongs_to = (?)", user).
-		Find(&products).
-		Limit(limit).
-		Offset(offset).
-		Find(&products).Error
+	err := query.Limit(limit).Offset(offset).Find(&products).Error
 
 	var count int
-	countErr:= db.Model(&dao.Product{}).WithContext(ctx).Select("COUNT(*)").Scan(&count).Error
+	countErr:= db.Model(&dao.Product{}).WithContext(params.Context).Select("COUNT(*)").Scan(&count).Error
 	if countErr != nil {
 		count = 1
 	}
