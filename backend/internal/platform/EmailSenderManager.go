@@ -2,6 +2,8 @@ package platform
 
 import (
 	"net/smtp"
+	"errors"
+	"sync"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -13,32 +15,40 @@ type EmailSenderManager struct {
 	From string
 }
 
-type Actions interface {
-	SendEmail(to []string, msg []byte) (bool, error)
+var (
+	emailManager *EmailSenderManager
+	emailOnce sync.Once
+)
+
+func getEmailSenderManager() *EmailSenderManager {
+	emailOnce.Do(func () {
+		err := godotenv.Load()
+
+		if err != nil {
+			log.Warning("Couldn't load env", err)
+			return
+		}
+
+		host := os.Getenv("STMP_HOST")
+
+		emailManager = &EmailSenderManager{
+			Host: host,
+			From: "no-reply@sender.com",
+		}
+	})
+
+	return emailManager
 }
 
-func (esm EmailSenderManager) SendEmail(to []string, msg []byte) (bool, error) {	
-	err := smtp.SendMail(esm.Host, nil, esm.From, to, msg)
+func SendEmail(to []string, msg []byte) error {
+	manager := getEmailSenderManager()
 
-	if err != nil {
-		return false, err
+	if manager == nil {
+		return errors.New("Empty manager")
 	}
 
-	return true, nil
+	err := smtp.SendMail(manager.Host, nil, manager.From, to, msg)
+	
+	return err
 }
 
-func GetEmailSenderManager() (*EmailSenderManager, error) {
-	err := godotenv.Load()
-
-	if err != nil {
-		log.Warning("Couldn't load env", err)
-		return nil, err
-	}
-
-	host := os.Getenv("STMP_HOST")
-
-	return &EmailSenderManager{
-		Host: host,
-		From: "no-reply@sender.com",
-	}, nil
-}

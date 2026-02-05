@@ -14,7 +14,6 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
 	"gorm.io/gorm"
-	"github.com/google/uuid"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	mysql "github.com/go-sql-driver/mysql"
@@ -25,33 +24,14 @@ func AuthRouter(router chi.Router) {
 		w.Header().Set("Content-Type", "application/json")
 
 		account := requests.CreateAccount{}
-
-		err := json.NewDecoder(r.Body).Decode(&account)
-
-		if err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&account); err != nil {
 			log.Error(err)
 			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
 			return
 		}
 
-		db := platform.GetInstance()
-
-		if db == nil {
-			tools.InternalServerErrorHandler(w, nil)
-			return
-		}
-
-		user := dao.User{
-			Uuid: uuid.New().String(),
-			Name: account.Name,
-			Email: account.Email,
-			Verified: false,
-			CreatedAt: time.Now().UTC(),
-		}
-
-		err = gorm.G[dao.User](db).Create(r.Context(), &user)
-
-		if err != nil {
+		token, err := db.CreateAccount(account, r.Context())
+		if err != nil  {
 			var mysqlErr *mysql.MySQLError
 
 			if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
@@ -65,37 +45,9 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
-		sender, err := platform.GetEmailSenderManager()
-
-		if err != nil {
-			log.Error(err)
-			tools.ServiceUnavailableErrorHandler(w)
-			return
-		}
-
-		token := tools.GenerateSecureToken(3)
-
-		magic := dao.Magic {
-			Token: token,
-			ExpirationDate: time.Now().UTC().Add(15 * time.Minute),
-			BelongsTo: user.Uuid,
-		}
-
-		err = gorm.G[dao.Magic](db).Create(r.Context(), &magic)
-
-		if err != nil {
-			log.Error(err)
-			msg := "Account creatd but we couldn't create the verification code, request another account"
-			tools.InternalServerErrorHandler(w, &msg)
-			return
-		}
-
 		to := []string{account.Email}
 		msg := []byte(fmt.Sprintf("Use this token to verify your account: %s", token))
-
-		_, err = sender.SendEmail(to, msg)
-
-		if err != nil {
+		if err := platform.SendEmail(to, msg); err != nil {
 			log.Warning("Couldn't send the email: ", err)
 			tools.ServiceUnavailableErrorHandler(w)
 			return
@@ -120,7 +72,7 @@ func AuthRouter(router chi.Router) {
 		}
 
 		var magic dao.Magic
-		if err := db.FindToken(verify.Token, verify.Email, &magic, &dao.User{}); err != nil {
+		if err := db.FindMagicLinkForUser(verify.Token, verify.Email, &magic); err != nil {
 			tools.UnprocessableContent(w, "The token or email are invalid")
 			return
 		}
@@ -171,14 +123,6 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
-		sender, err := platform.GetEmailSenderManager()
-
-		if err != nil {
-			log.Error(err)
-			tools.InternalServerErrorHandler(w, nil)
-			return
-		}
-
 		var user dao.User
 		if err := db.FetchUser(resend.Email, &user, r.Context()); err != nil {
 			resp := tools.Message {
@@ -198,8 +142,7 @@ func AuthRouter(router chi.Router) {
 
 		to := []string{resend.Email}
 		msg := []byte(fmt.Sprintf("Use this token to verify your account: %s", magic.Token))
-
-		if ok, err := sender.SendEmail(to, msg); !ok {
+		if err := platform.SendEmail(to, msg); err != nil {
 			log.Error(err)
 			tools.InternalServerErrorHandler(w, nil)
 			return
