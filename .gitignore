@@ -5,3 +5,5 @@ db/.env
 db/.idea
 
 main
+
+redis.conf
