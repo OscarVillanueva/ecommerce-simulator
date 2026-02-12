@@ -13,7 +13,6 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/internal/db"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
-	"gorm.io/gorm"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	mysql "github.com/go-sql-driver/mysql"
@@ -83,23 +82,7 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 	
-		sharedDB := platform.GetInstance()
-
-		err := sharedDB.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-
-			userError := tx.Model(&dao.User{}).Where("uuid = ?", magic.BelongsTo).Update("verified", true).Error
-			if userError != nil {
-				return userError
-			}
-
-			if magicError := tx.Where("token = ?", magic.Token).Delete(&magic).Error; magicError != nil {
-				return magicError
-			}
-
-			return nil
-		})
-
-		if err != nil {
+		if err := db.VerifyUserAccount(magic, r.Context()); err != nil {
 			log.Error("We couldnt delete the token")
 			tools.InternalServerErrorHandler(w, nil)
 			return
