@@ -1,12 +1,16 @@
 package tools
 
 import (
-	"errors"
 	"sync"
 	"time"
+	"errors"
+	"context"
 	"crypto/ecdsa"
 
+	"github.com/OscarVillanueva/goapi/internal/platform"
+
 	"github.com/golang-jwt/jwt/v5"
+	log "github.com/sirupsen/logrus"
 )
 
 
@@ -30,9 +34,53 @@ func getKeyManager() *JWTKeyManager  {
 }
 
 func (manager *JWTKeyManager) initialize()  {
-	if result, err := generateJWTKeys(); err == nil {
-		manager.PublicKey = result.Verify
-		manager.PrivateKey = result.Sign
+	ctx := context.Background()
+
+	var privateKey *ecdsa.PrivateKey
+	var publicKey *ecdsa.PublicKey
+
+	privateStr, prErr := platform.GetSecret("private-key", ctx)
+	publicStr, pubErr := platform.GetSecret("public-key", ctx)
+
+	if prErr != nil || pubErr != nil {
+		log.Warning("Read error: ", prErr)
+		log.Warning("Read error: ", pubErr)
+
+		if result, err := generateJWTKeys(); err == nil {
+			privateKey = result.Sign
+			publicKey = result.Verify
+
+			handleSaveCredentials(result.Public, result.Private, ctx)
+		}
+	} else {
+		privateKey, prErr = parsePrivatePemToKey(privateStr)
+		publicKey, pubErr = parsePublicPemToKey(publicStr)
+
+		if prErr != nil || pubErr != nil {
+			log.Warning("Parse error: ", prErr)
+			log.Warning("Parse error: ", pubErr)
+
+			if result, err := generateJWTKeys(); err == nil {
+				privateKey = result.Sign
+				publicKey = result.Verify
+
+				handleSaveCredentials(result.Public, result.Private, ctx)
+			}
+		}
+	}
+
+	manager.PublicKey = publicKey
+	manager.PrivateKey = privateKey
+}
+
+func handleSaveCredentials(public string, private string, ctx context.Context)  {
+	errPr := platform.SaveSecret("private-key", private, ctx)
+	errPub := platform.SaveSecret("public-key", public, ctx)
+
+	if errPr != nil || errPub != nil {
+		log.Warning("Couldn't update the Credentials")
+	} else {
+		log.Info("Saved New Credentials")
 	}
 }
 
