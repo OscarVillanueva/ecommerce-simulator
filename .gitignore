@@ -7,3 +7,5 @@ db/.idea
 main
 
 redis.conf
+
+tempo-data
