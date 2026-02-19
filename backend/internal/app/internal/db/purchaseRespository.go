@@ -10,6 +10,8 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
 
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel"
 	"github.com/google/uuid"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm"
@@ -23,28 +25,45 @@ func (e *ErrInsufficientStock) Error() string {
     return fmt.Sprintf("insufficient stock for %s", e.Product)
 }
 
+const PurchaseRepositoryName = "purchase-repository"
+
 func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx context.Context) (string, error) {
+	tr := otel.Tracer(PurchaseRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.BatchPurchase", PurchaseRepositoryName))
+	defer span.End()
+
 	db := platform.GetInstance()
 
 	if db == nil {
-		return "",errors.New("We couldn't connect to the database")
+		dbErr := errors.New("We couldn't connect to the database")
+		span.RecordError(dbErr)
+		span.SetStatus(codes.Error, dbErr.Error())
+		return "", dbErr
 	}
 
 	purchaseID := uuid.New().String()
 
-	err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := db.WithContext(trContext).Transaction(func(tx *gorm.DB) error {
 		for _, purchase := range purchases {
 			if purchase.Quantity < 0 {
-				return errors.New("Quantity must be greater than zero")
+				quantityErr := errors.New("Quantity must be greater than zero: " + purchase.Product)
+				span.RecordError(quantityErr)
+				span.SetStatus(codes.Error, quantityErr.Error())
+				return quantityErr
 			}
 
 			var product dao.Product
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 				Where("uuid = ?", purchase.Product).First(&product).Error; err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, fmt.Sprintf("Unable to find product: %s", purchase.Product))
 				return err
 			}
 
 			if product.Quantity < purchase.Quantity {
+				quantityErr := errors.New(fmt.Sprintf("Quantity %f must be available for product %s", purchase.Quantity, product.Uuid))
+				span.RecordError(quantityErr)
+				span.SetStatus(codes.Error, quantityErr.Error())
 				return &ErrInsufficientStock{Product: product.Name}
 			}
 
@@ -59,6 +78,8 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 			}
 
 			if err := tx.Create(&newPurchase).Error; err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				return err
 			}
 
@@ -71,6 +92,8 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 
 			result := tx.Model(&product).Where("uuid = ?", product.Uuid).Updates(updatedProduct)
 			if result.Error != nil {
+				span.RecordError(result.Error)
+				span.SetStatus(codes.Error, fmt.Sprintf("Unable to update the quantity of product: %s", product.Uuid))
 				return result.Error
 			}
 		}
@@ -82,10 +105,17 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 }
 
 func FetchTickets(page int, buyer string, ctx context.Context) ([]dao.Ticket, error) {
+	tr := otel.Tracer(PurchaseRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.FetchTickets", PurchaseRepositoryName))
+	defer span.End()
+
 	db := platform.GetInstance()
 
 	if db == nil {
-		return nil, errors.New("We couldn't connect to the database")
+		dbErr := errors.New("We couldn't connect to the database")
+		span.RecordError(dbErr)
+		span.SetStatus(codes.Error, dbErr.Error())
+		return nil, dbErr
 	}
 
 	limit := 30
@@ -93,7 +123,7 @@ func FetchTickets(page int, buyer string, ctx context.Context) ([]dao.Ticket, er
 
 	ticket := make([]dao.Ticket, 0)
 	err := db.Model(&dao.Purchase{}).
-		WithContext(ctx).
+		WithContext(trContext).
 		Where("purchased_by = ?", buyer).
 		Select("MAX(created_at) as created_at, SUM(price * quantity) as total, ticket_id").
 		Group("ticket_id").
@@ -106,15 +136,22 @@ func FetchTickets(page int, buyer string, ctx context.Context) ([]dao.Ticket, er
 }
 
 func FetchPurchase(purchaseId string, buyer string, ctx context.Context) ([]dao.Purchase, error) {
+	tr := otel.Tracer(PurchaseRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.FetchPurchase", PurchaseRepositoryName))
+	defer span.End()
+
 	db := platform.GetInstance()
 
 	if db == nil {
-		return nil, errors.New("We couldn't connect to the database")
+		dbErr := errors.New("We couldn't connect to the database")
+		span.RecordError(dbErr)
+		span.SetStatus(codes.Error, dbErr.Error())
+		return nil, dbErr
 	}
 
 	purchases := make([]dao.Purchase, 0)
 	err := db.Model(&dao.Purchase{}).
-		WithContext(ctx).
+		WithContext(trContext).
 		Where("ticket_id = ? AND purchased_by = ?", purchaseId, buyer).
 		Find(&purchases).
 		Error
@@ -123,17 +160,26 @@ func FetchPurchase(purchaseId string, buyer string, ctx context.Context) ([]dao.
 }
 
 func DeletePurchase(purchases []dao.Purchase, ctx context.Context) error  {
+	tr := otel.Tracer(PurchaseRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.DeletePurchase", PurchaseRepositoryName))
+	defer span.End()
+
 	db := platform.GetInstance()
 
 	if db == nil {
-		return errors.New("We couldn't connect to the database")
+		dbErr := errors.New("We couldn't connect to the database")
+		span.RecordError(dbErr)
+		span.SetStatus(codes.Error, dbErr.Error())
+		return dbErr
 	}
 
-	err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := db.WithContext(trContext).Transaction(func(tx *gorm.DB) error {
 		for _, purchase := range purchases {
 			var product dao.Product
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 				Where("uuid = ?", purchase.Product).First(&product).Error; err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, fmt.Sprintf("We couldn't find the product: %s", purchase.Product))
 				return err
 			}
 
@@ -146,11 +192,15 @@ func DeletePurchase(purchases []dao.Purchase, ctx context.Context) error  {
 
 			result := tx.Model(&product).Where("uuid = ?", product.Uuid).Updates(updatedProduct)
 			if result.Error != nil {
+				span.RecordError(result.Error)
+				span.SetStatus(codes.Error, fmt.Sprintf("We couldn't update the quantity of the product: %s", purchase.Product))
 				return result.Error
 			}
 
 			err := tx.Where("uuid = ? AND ticket_id = ?", purchase.Uuid, purchase.TicketId).Delete(&purchase).Error
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, fmt.Sprintf("We couldn't the purchase: %s", purchase.Uuid))
 				return err
 			}
 		}

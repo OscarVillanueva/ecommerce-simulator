@@ -20,11 +20,11 @@ import (
 )
 
 var ErrProductNotFound = errors.New("Product Not Found")
-var RepositoryName = "product-repository"
+var ProductRepositoryName = "product-repository"
 
 func InsertProduct(product *requests.CreateProduct, belongTo string, ctx context.Context) (*dao.Product, error) {
-	tr := otel.Tracer(RepositoryName)
-	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.InsertProduct", RepositoryName))
+	tr := otel.Tracer(ProductRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.InsertProduct", ProductRepositoryName))
 	defer span.End()
 
 	db := platform.GetInstance()
@@ -53,13 +53,13 @@ func InsertProduct(product *requests.CreateProduct, belongTo string, ctx context
 		return nil, err
 	}
 	
-	span.SetStatus(codes.Ok, "InsertProduct success")
+	span.SetStatus(codes.Ok, fmt.Sprintf("%s.InsertProduct successfully", ProductRepositoryName))
 	return &p, nil
 }
 
 func DeleteProduct(uuid string, user string, ctx context.Context) error  {
-	tr := otel.Tracer(RepositoryName)
-	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.DeleteProduct", RepositoryName))
+	tr := otel.Tracer(ProductRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.DeleteProduct", ProductRepositoryName))
 	defer span.End()
 
 	db := platform.GetInstance()
@@ -83,14 +83,14 @@ func DeleteProduct(uuid string, user string, ctx context.Context) error  {
 		return ErrProductNotFound
 	}
 
-	span.SetStatus(codes.Ok, "DeleteProduct successfully")
+	span.SetStatus(codes.Ok, fmt.Sprintf("%s.DeleteProduct successfully", ProductRepositoryName))
 
 	return nil
 }
 
 func UpdateProduct(productID string, product *requests.CreateProduct, belongTo string, ctx context.Context) error  {
-	tr := otel.Tracer(RepositoryName)
-	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.DeleteProduct", RepositoryName))
+	tr := otel.Tracer(ProductRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.UpdateProduct", ProductRepositoryName))
 	defer span.End()
 
 	db := platform.GetInstance()
@@ -124,12 +124,14 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 		return ErrProductNotFound
 	}
 
+	span.SetStatus(codes.Ok, fmt.Sprintf("%s.UpdateProduct successfully", ProductRepositoryName))
+
 	return nil
 }
 
 func GetProducts(params parameters.GetProductsParams) (*requests.ProductsResponse, error) {
-	tr := otel.Tracer(RepositoryName)
-	ctx, span := tr.Start(params.Context, fmt.Sprintf("%s.GetProducts", RepositoryName))
+	tr := otel.Tracer(ProductRepositoryName)
+	ctx, span := tr.Start(params.Context, fmt.Sprintf("%s.GetProducts", ProductRepositoryName))
 	defer span.End()
 
 	db := platform.GetInstance()
@@ -177,14 +179,12 @@ func GetProducts(params parameters.GetProductsParams) (*requests.ProductsRespons
 		Pages: int(math.Ceil(float64(count) / float64(limit))),
 	}
 
-	span.SetStatus(codes.Ok, "GetProducts successfully")
-
 	return &response, err
 }
 
 func GetProduct(user string, productId string, ctx context.Context) (*dao.Product, error) {
-	tr := otel.Tracer(RepositoryName)
-	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.GetProducts", RepositoryName))
+	tr := otel.Tracer(ProductRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.GetProduct", ProductRepositoryName))
 	defer span.End()
 
 	db := platform.GetInstance()
@@ -204,14 +204,12 @@ func GetProduct(user string, productId string, ctx context.Context) (*dao.Produc
 		return nil, ErrProductNotFound
 	}
 
-	span.SetStatus(codes.Ok, "GetProduct successfully")
-
 	return &product, err
 }
 
 func UpdateProductImage(productID string, path string, userID string, ctx context.Context) error {
-	tr := otel.Tracer(RepositoryName)
-	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.GetProducts", RepositoryName))
+	tr := otel.Tracer(ProductRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.UpdateProductImage", ProductRepositoryName))
 	defer span.End()
 
 	db := platform.GetInstance()
@@ -242,7 +240,7 @@ func UpdateProductImage(productID string, path string, userID string, ctx contex
 		return ErrProductNotFound
 	}
 
-	span.SetStatus(codes.Ok, "UpdateProductImage successfully")
+	span.SetStatus(codes.Ok, fmt.Sprintf("%s.UpdateProductImage successfully", ProductRepositoryName))
 
 	return nil
 }

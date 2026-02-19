@@ -71,7 +71,7 @@ func AuthRouter(router chi.Router) {
 		}
 
 		var magic dao.Magic
-		if err := db.FindMagicLinkForUser(verify.Token, verify.Email, &magic); err != nil {
+		if err := db.FindMagicLinkForUser(verify.Token, verify.Email, &magic, r.Context()); err != nil {
 			tools.UnprocessableContent(w, "The token or email are invalid")
 			return
 		}

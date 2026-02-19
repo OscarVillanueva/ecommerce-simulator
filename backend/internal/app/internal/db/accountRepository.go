@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"time"
 	"errors"
 	"context"
@@ -10,19 +11,30 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
-	"gorm.io/gorm"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
+var AccountRepositoryName = "account-repository"
+
 func CreateAccount(account requests.CreateAccount, ctx context.Context) (string, error)  {
+	tr := otel.Tracer(AccountRepositoryName)
+	trContext, span := tr.Start(ctx, fmt.Sprintf("%s.CreateAccount", AccountRepositoryName))
+	defer span.End()
+
 	db := platform.GetInstance()
 
 	if db == nil {
-		return "", errors.New("We couldn't connect to the database")
+		dbErr := errors.New("We couldn't connect to the database")
+		span.RecordError(dbErr)
+		span.SetStatus(codes.Error, dbErr.Error())
+		return "", dbErr
 	}
 
 	var token string
-	err := db.WithContext(ctx).Transaction(func (tx *gorm.DB) error {
+	err := db.WithContext(trContext).Transaction(func (tx *gorm.DB) error {
 		user := dao.User{
 			Uuid: uuid.New().String(),
 			Name: account.Name,
@@ -32,6 +44,8 @@ func CreateAccount(account requests.CreateAccount, ctx context.Context) (string,
 		}
 
 		if err := tx.Create(&user).Error; err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, fmt.Sprintf("%s: %v", "CreateUser", err.Error()))
 			return err
 		}
 
@@ -43,6 +57,8 @@ func CreateAccount(account requests.CreateAccount, ctx context.Context) (string,
 		}
 
 		if err := tx.Create(&magic).Error; err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, fmt.Sprintf("%s: %v", "CreateMagicLink", err.Error()))
 			return err
 		}
 
