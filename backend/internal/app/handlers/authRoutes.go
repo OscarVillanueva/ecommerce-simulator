@@ -13,7 +13,7 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/internal/db"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	log "github.com/sirupsen/logrus"
 	mysql "github.com/go-sql-driver/mysql"
 )

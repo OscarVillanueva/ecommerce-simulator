@@ -32,9 +32,11 @@ services:
       - --storage.path=/var/lib/alloy/data
       - --server.http.listen-addr=0.0.0.0:12345
     ports:
-      - "12345:12345"
       - "4317:4317"
       - "4318:4318"
+    labels:
+      traefik.http.routers.alloy.rule: Host(`alloy.localhost`)
+      traefik.http.services.alloy.loadbalancer.server.port: 12345
     depends_on:
       - tempo
 
@@ -76,8 +78,9 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
       - GF_INSTALL_PLUGINS=grafana-exploretraces-app  ## plugin...
-    ports:
-      - "3000:3000"
+    labels:
+      traefik.http.routers.grafana.rule: Host(`grafana.localhost`)
+      traefik.http.services.grafana.loadbalancer.server.port: 3000
 
   redis:
     image: redis:7.4

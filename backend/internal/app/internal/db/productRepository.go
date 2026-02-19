@@ -2,6 +2,7 @@ package db
 
 import (
 	"time"
+	"fmt"
 	"math"
 	"errors"
 	"context"
@@ -11,11 +12,14 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 var ErrProductNotFound = errors.New("Product Not Found")
+var RepositoryName = "product-repository"
 
 func InsertProduct(product *requests.CreateProduct, belongTo string, ctx context.Context) (*dao.Product, error) {
 	db := platform.GetInstance()
@@ -92,24 +96,36 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 }
 
 func GetProducts(params parameters.GetProductsParams) (*requests.ProductsResponse, error) {
+	tr := otel.Tracer(RepositoryName)
+	ctx, span := tr.Start(params.Context, fmt.Sprintf("%s.GetProducts", RepositoryName))
+	defer span.End()
+
 	db := platform.GetInstance()
 
 	if db == nil {
-		return nil, errors.New("We couldn't connect to the database")
+		dbErr := errors.New("We couldn't connect to the database")
+		span.RecordError(dbErr)
+		return nil, dbErr
 	}
 	
 	limit := 30
 	offset := (params.Page - 1) * limit
 
-	query := db.WithContext(params.Context).Model(&dao.Product{}).Where("belongs_to = (?)", params.User)
+	query := db.WithContext(ctx).Model(&dao.Product{}).Where("belongs_to = (?)", params.User)
 
 	if params.OnlyAvailable {
 		query = query.Where("quantity > 0")
+		span.SetAttributes(
+			attribute.Bool("OnlyAvailable", true),
+		)
 	}
 
 	if params.SearchName != "" {
 		fullSearch := "%" + params.SearchName + "%"
     query = query.Where("name LIKE ?", fullSearch)
+		span.SetAttributes(
+			attribute.String("SearchName", fullSearch),
+		)
 	}
 
 	products := make([]dao.Product, 0)
@@ -119,6 +135,7 @@ func GetProducts(params parameters.GetProductsParams) (*requests.ProductsRespons
 	countErr:= db.Model(&dao.Product{}).WithContext(params.Context).Select("COUNT(*)").Scan(&count).Error
 	if countErr != nil {
 		count = 1
+		span.RecordError(countErr)
 	}
 
 	response := requests.ProductsResponse {
