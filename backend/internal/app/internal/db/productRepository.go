@@ -48,6 +48,13 @@ func InsertProduct(product *requests.CreateProduct, belongTo string, ctx context
 	}
 
 	if err := gorm.G[dao.Product](db).Create(trContext, &p); err != nil {
+		span.SetAttributes(
+			attribute.String("Uuid", p.Uuid),
+			attribute.String("Name", product.Name),
+			attribute.Int("Quantity", int(product.Quantity)),
+			attribute.Float64("Price", float64(product.Price)),
+			attribute.String("BelongsTo", belongTo),
+		)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -73,6 +80,10 @@ func DeleteProduct(uuid string, user string, ctx context.Context) error  {
 
 	result := db.WithContext(trContext).Where("uuid = (?) AND belongs_to = (?)", uuid, user).Delete(&dao.Product{})
 	if result.Error != nil {
+		span.SetAttributes(
+			attribute.String("ProductUuid", uuid),
+			attribute.String("BelongsTo", user),
+		)
 		span.RecordError(result.Error)
 		span.SetStatus(codes.Error, result.Error.Error())
 		return result.Error
@@ -115,6 +126,13 @@ func UpdateProduct(productID string, product *requests.CreateProduct, belongTo s
 		Updates(updatedProduct)
 	
 	if result.Error != nil {
+		span.SetAttributes(
+			attribute.String("ProductUuid", productID),
+			attribute.String("Name", product.Name),
+			attribute.Int("Quantity", int(product.Quantity)),
+			attribute.Float64("Price", float64(product.Price)),
+			attribute.String("BelongsTo", belongTo),
+		)
 		span.RecordError(result.Error)
 		span.SetStatus(codes.Error, result.Error.Error())
 		return result.Error
@@ -199,6 +217,10 @@ func GetProduct(user string, productId string, ctx context.Context) (*dao.Produc
 	err := db.WithContext(trContext).Where("belongs_to = (?) AND uuid = (?)", user, productId).First(&product).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		span.SetAttributes(
+			attribute.String("BelongsTo", user),
+			attribute.String("ProductUuid", productId),
+		)
 		span.RecordError(ErrProductNotFound)
 		span.SetStatus(codes.Error, ErrProductNotFound.Error())
 		return nil, ErrProductNotFound
@@ -230,6 +252,10 @@ func UpdateProductImage(productID string, path string, userID string, ctx contex
 		Updates(updatedProduct)
 	
 	if result.Error != nil {
+		span.SetAttributes(
+			attribute.String("BelongsTo", userID),
+			attribute.String("ProductUuid", productID),
+		)
 		span.RecordError(result.Error)
 		span.SetStatus(codes.Error, result.Error.Error())
 		return result.Error

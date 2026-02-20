@@ -9,6 +9,7 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel"
 )
@@ -33,6 +34,10 @@ func FindMagicLinkForUser(token string, email string, magic *dao.Magic, ctx cont
 
 	err := db.WithContext(trContext).Where("token = ? AND belongs_to = (?)", token, userSubQuery).First(magic).Error
 	if err != nil {
+		span.SetAttributes(
+			attribute.String("Token", token),
+			attribute.String("Email", email),
+		)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return err
@@ -65,6 +70,10 @@ func FetchMagicLink(userUuid string, token string, magic *dao.Magic, ctx context
 	}
 
 	if err := db.WithContext(trContext).Where("token = ? AND belongs_to = ?", token, userUuid).First(magic).Error; err != nil {
+		span.SetAttributes(
+			attribute.String("Token", token),
+			attribute.String("UserUuid", userUuid),
+		)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return err
@@ -90,6 +99,9 @@ func DeleteMagicLink(userUuid string, ctx context.Context) error {
 	}
 
 	if err := db.WithContext(trContext).Where("belongs_to = (?)", userUuid).Delete(&dao.Magic{}).Error; err != nil {
+		span.SetAttributes(
+			attribute.String("BelongsTo", userUuid),
+		)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return err

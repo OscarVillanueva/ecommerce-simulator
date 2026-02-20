@@ -11,6 +11,7 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/tools"
 	"github.com/OscarVillanueva/goapi/internal/platform"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel"
 	"github.com/google/uuid"
@@ -44,6 +45,11 @@ func CreateAccount(account requests.CreateAccount, ctx context.Context) (string,
 		}
 
 		if err := tx.Create(&user).Error; err != nil {
+			span.SetAttributes(
+				attribute.String("Uuid", user.Uuid),
+				attribute.String("Name", user.Name),
+				attribute.String("Email", user.Email),
+			)
 			span.RecordError(err)
 			span.SetStatus(codes.Error, fmt.Sprintf("%s: %v", "CreateUser", err.Error()))
 			return err
@@ -57,6 +63,11 @@ func CreateAccount(account requests.CreateAccount, ctx context.Context) (string,
 		}
 
 		if err := tx.Create(&magic).Error; err != nil {
+			span.SetAttributes(
+				attribute.String("Token", magic.Token),
+				attribute.String("ExpirationDate", magic.ExpirationDate.String()),
+				attribute.String("BelongsTo", user.Uuid),
+			)
 			span.RecordError(err)
 			span.SetStatus(codes.Error, fmt.Sprintf("%s: %v", "CreateMagicLink", err.Error()))
 			return err
