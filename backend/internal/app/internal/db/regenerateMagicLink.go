@@ -49,6 +49,10 @@ func RegenerateMagicLink(ctx context.Context, uuid string, magic *dao.Magic) err
 		}
 
 		if magicError := tx.Create(&magic).Error; magicError != nil {
+			span.SetAttributes(
+				attribute.String("Token", magic.Token),
+				attribute.String("BelongsTo", magic.BelongsTo),
+			)
 			span.RecordError(magicError)
 			span.SetStatus(codes.Error, magicError.Error())
 			return magicError

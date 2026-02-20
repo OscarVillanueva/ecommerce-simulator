@@ -10,6 +10,7 @@ import (
 	"github.com/OscarVillanueva/goapi/internal/app/models/dao"
 	"github.com/OscarVillanueva/goapi/internal/app/models/requests"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel"
 	"github.com/google/uuid"
@@ -55,16 +56,23 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 			var product dao.Product
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 				Where("uuid = ?", purchase.Product).First(&product).Error; err != nil {
+				span.SetAttributes(
+					attribute.String("ProductUuid", purchase.Product),
+				)
 				span.RecordError(err)
-				span.SetStatus(codes.Error, fmt.Sprintf("Unable to find product: %s", purchase.Product))
+				span.SetStatus(codes.Error, err.Error())
 				return err
 			}
 
 			if product.Quantity < purchase.Quantity {
-				quantityErr := errors.New(fmt.Sprintf("Quantity %f must be available for product %s", purchase.Quantity, product.Uuid))
-				span.RecordError(quantityErr)
-				span.SetStatus(codes.Error, quantityErr.Error())
-				return &ErrInsufficientStock{Product: product.Name}
+				msgErr := ErrInsufficientStock{Product: product.Name}
+				span.SetAttributes(
+					attribute.String("ProductUuid", product.Uuid),
+					attribute.Int("PurchaseQuantity", int(purchase.Quantity)),
+				)
+				span.RecordError(errors.New(msgErr.Error()))
+				span.SetStatus(codes.Error, msgErr.Error())
+				return &msgErr
 			}
 
 			newPurchase := dao.Purchase{
@@ -78,6 +86,14 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 			}
 
 			if err := tx.Create(&newPurchase).Error; err != nil {
+				span.SetAttributes(
+					attribute.String("Uuid", newPurchase.Uuid),
+					attribute.String("TicketId", newPurchase.TicketId),
+					attribute.String("ProductUuid", newPurchase.Product),
+					attribute.Float64("Price", float64(newPurchase.Price)),
+					attribute.Int("Quantity", int(newPurchase.Quantity)),
+					attribute.String("PurchasedBy", newPurchase.PurchasedBy),
+				)
 				span.RecordError(err)
 				span.SetStatus(codes.Error, err.Error())
 				return err
@@ -92,6 +108,10 @@ func BatchPurchase(purchases []requests.CreatePurchase, buyer string, ctx contex
 
 			result := tx.Model(&product).Where("uuid = ?", product.Uuid).Updates(updatedProduct)
 			if result.Error != nil {
+				span.SetAttributes(
+					attribute.String("ProductUuid", product.Uuid),
+					attribute.Int("Quantity", int(quantity)),
+				)
 				span.RecordError(result.Error)
 				span.SetStatus(codes.Error, fmt.Sprintf("Unable to update the quantity of product: %s", product.Uuid))
 				return result.Error
@@ -121,6 +141,10 @@ func FetchTickets(page int, buyer string, ctx context.Context) ([]dao.Ticket, er
 	limit := 30
 	offset := (page - 1) * limit
 
+	span.SetAttributes(
+		attribute.String("PurchasedBy", buyer),
+	)
+
 	ticket := make([]dao.Ticket, 0)
 	err := db.Model(&dao.Purchase{}).
 		WithContext(trContext).
@@ -148,6 +172,11 @@ func FetchPurchase(purchaseId string, buyer string, ctx context.Context) ([]dao.
 		span.SetStatus(codes.Error, dbErr.Error())
 		return nil, dbErr
 	}
+
+	span.SetAttributes(
+		attribute.String("TicketId", purchaseId),
+		attribute.String("PurchasedBy", buyer),
+	)
 
 	purchases := make([]dao.Purchase, 0)
 	err := db.Model(&dao.Purchase{}).
@@ -178,8 +207,11 @@ func DeletePurchase(purchases []dao.Purchase, ctx context.Context) error  {
 			var product dao.Product
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 				Where("uuid = ?", purchase.Product).First(&product).Error; err != nil {
+				span.SetAttributes(
+					attribute.String("ProductUuid", purchase.Product),
+				)
 				span.RecordError(err)
-				span.SetStatus(codes.Error, fmt.Sprintf("We couldn't find the product: %s", purchase.Product))
+				span.SetStatus(codes.Error, err.Error())
 				return err
 			}
 
@@ -192,6 +224,9 @@ func DeletePurchase(purchases []dao.Purchase, ctx context.Context) error  {
 
 			result := tx.Model(&product).Where("uuid = ?", product.Uuid).Updates(updatedProduct)
 			if result.Error != nil {
+				span.SetAttributes(
+					attribute.String("ProductUuid", product.Uuid),
+				)
 				span.RecordError(result.Error)
 				span.SetStatus(codes.Error, fmt.Sprintf("We couldn't update the quantity of the product: %s", purchase.Product))
 				return result.Error
@@ -199,6 +234,10 @@ func DeletePurchase(purchases []dao.Purchase, ctx context.Context) error  {
 
 			err := tx.Where("uuid = ? AND ticket_id = ?", purchase.Uuid, purchase.TicketId).Delete(&purchase).Error
 			if err != nil {
+				span.SetAttributes(
+					attribute.String("PurchaseUuid", purchase.Uuid),
+					attribute.String("TicketId", purchase.TicketId),
+				)
 				span.RecordError(err)
 				span.SetStatus(codes.Error, fmt.Sprintf("We couldn't the purchase: %s", purchase.Uuid))
 				return err
