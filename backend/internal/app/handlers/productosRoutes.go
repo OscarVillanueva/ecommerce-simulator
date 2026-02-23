@@ -20,7 +20,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel"
 	"github.com/go-chi/chi/v5"
-	log "github.com/sirupsen/logrus"
 )
 
 const ProductsRouterName = "products-router"
@@ -38,11 +37,13 @@ func ProductsRouter(router chi.Router)  {
 		onlyAvailable := false
 
 		userID, ok := ctx.Value(middleware.UserUUIDKey).(string)
+
+		span.SetAttributes(
+			attribute.String("uuid", userID),
+		)
+		
 		if !ok || userID == ""{
 			err := errors.New("Missing user uuid")
-			span.SetAttributes(
-				attribute.String("uuid", userID),
-			)
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			tools.UnauthorizedErrorHandler(w, nil)
@@ -214,7 +215,6 @@ func ProductsRouter(router chi.Router)  {
 			span.SetStatus(codes.Error, err.Error())
 
 			// Real DB error
-			log.Error("Failed to delete product: ", err)
 			tools.InternalServerErrorHandler(w, nil)
 			return
 		}
@@ -291,7 +291,6 @@ func ProductsRouter(router chi.Router)  {
 			span.SetStatus(codes.Error, err.Error())
 
 			// Real DB error
-			log.Error("Failed to delete product: ", err)
 			tools.InternalServerErrorHandler(w, nil)
 			return
 		}
@@ -353,7 +352,6 @@ func ProductsRouter(router chi.Router)  {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 
-			log.Error("Failed to delete product: ", err)
 			tools.InternalServerErrorHandler(w, nil)
 			return
 		}
@@ -404,7 +402,6 @@ func ProductsRouter(router chi.Router)  {
 			span.SetStatus(codes.Error, putErr.Error())
 
 			// Real DB error
-			log.Error("Failed to update the product: ", updateErr)
 			tools.InternalServerErrorHandler(w, nil)
 			return
 		}
