@@ -54,6 +54,19 @@ func PurchaseRouter(router chi.Router)  {
 			return
 		}
 
+		i := 0
+		var valErr error
+
+		for i < len(ticket) && valErr == nil {
+			if err := ticket[i].Validate(); err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				valErr = err
+			}
+
+			i = i + 1
+		}
+
 		purchaseID, err := db.BatchPurchase(ticket, userID, ctx)
 
 		if err != nil {

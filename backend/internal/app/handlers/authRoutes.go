@@ -38,6 +38,13 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
+		if err := account.Validate(); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			tools.BadRequestErrorHandler(w, err)
+			return
+		}
+
 		token, err := db.CreateAccount(account, ctx)
 		if err != nil  {
 			var mysqlErr *mysql.MySQLError
@@ -92,6 +99,13 @@ func AuthRouter(router chi.Router) {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
+			return
+		}
+
+		if err := verify.Validate(); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			tools.BadRequestErrorHandler(w, err)
 			return
 		}
 
@@ -155,6 +169,13 @@ func AuthRouter(router chi.Router) {
 			return
 		}
 
+		if err := resend.Validate(); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			tools.BadRequestErrorHandler(w, err)
+			return
+		}
+
 		var user dao.User
 		if err := db.FetchUser(resend.Email, &user, ctx); err != nil {
 			span.RecordError(err)
@@ -208,6 +229,13 @@ func AuthRouter(router chi.Router) {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			tools.BadRequestErrorHandler(w, errors.New("Invalid body request"))
+			return
+		}
+
+		if err := login.Validate(); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			tools.BadRequestErrorHandler(w, err)
 			return
 		}
 
