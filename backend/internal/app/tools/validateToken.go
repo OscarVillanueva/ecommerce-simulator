@@ -1,14 +1,15 @@
 package tools
 
 import (
-	"errors"
 	"fmt"
+	"errors"
+	"context"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func IsValidToken(tokenString string) (map[string]any, error)  {
-	manager := getKeyManager()
+func IsValidToken(tokenString string, ctx context.Context) (map[string]any, error)  {
+	manager := getKeyManager(ctx)
 
 	if manager.PublicKey == nil {
 		return nil, errors.New("Public key not found")
