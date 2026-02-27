@@ -9,8 +9,8 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"github.com/go-chi/chi/v5"
-	log "github.com/sirupsen/logrus"
 	"github.com/riandyrn/otelchi"
+	log "github.com/sirupsen/logrus"
 	otelchimetric "github.com/riandyrn/otelchi/metric"
 )
 
@@ -46,10 +46,25 @@ func main()  {
 		}
 	}()
 
-	log.Info("Starting GO API Server")
+	if err := platform.InitMinio(ctx); err != nil {
+		log.Panic(err)
+	}
 
+	if err := platform.InitMailManager(ctx); err != nil {
+		log.Panic(err)
+	}
+
+	if err := platform.InitSecretsManager(ctx); err != nil {
+		log.Panic(err)
+	}
+
+	if err := platform.InitDbConnection(ctx); err != nil {
+		log.Panic(err)
+	}
+
+	log.Info("Starting GO API Server")
 	if err := http.ListenAndServe("backend:4321", r); err != nil {
-		log.Error(err)
+		log.Panic(err)
 	}
 }
 

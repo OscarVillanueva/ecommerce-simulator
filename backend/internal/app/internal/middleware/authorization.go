@@ -31,7 +31,7 @@ func Authorization(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := tools.IsValidToken(parts[1])
+		claims, err := tools.IsValidToken(parts[1], trContext)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Invalid Token")

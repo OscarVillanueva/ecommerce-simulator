@@ -1,17 +1,18 @@
 package platform
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"sync"
 	"os"
 
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"github.com/joho/godotenv"
-	log "github.com/sirupsen/logrus"
 )
 
-var once sync.Once
 var sharedInstance *gorm.DB
 
 type dbConnection struct {
@@ -28,6 +29,59 @@ func (db dbConnection) Connect() (*gorm.DB, error) {
 	return connection, err
 }
 
+func InitDbConnection (ctx context.Context) error {
+	DBManager := "db-manger"
+	tr := otel.Tracer(DBManager)
+	_, span := tr.Start(ctx, fmt.Sprintf("%s.InitSecretsManager", DBManager))
+	defer span.End()
+
+	if err := godotenv.Load(); err != nil {
+		err := errors.New("Unable to load godot")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, fmt.Sprintf("Unable to load env: %s", err.Error()))
+		return err
+	}
+	
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		err := errors.New("DB_HOST environment variable is empty")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, fmt.Sprintf("Unable to load env: %s", err.Error()))
+		return err
+	}
+
+	dbName := os.Getenv("DB_DATABASE")
+	if dbName == "" {
+		err := errors.New("DB_DATABASE environment variable is empty")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, fmt.Sprintf("Unable to load env: %s", err.Error()))
+		return err
+	}
+
+	dbUser := fmt.Sprintf("%s:%s", os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"))	
+
+	dbConn := dbConnection {
+		Host: dbHost,
+		Database: dbName,
+		User: dbUser,
+	}
+
+	var err error
+	sharedInstance, err = dbConn.Connect()
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
+	return err
+}
+
+func GetInstance() *gorm.DB {
+	return sharedInstance
+}
+
+/*
 func GetInstance() (*gorm.DB) {
 	/* DLC singleton
 	if SharedInstance == nil {
@@ -69,7 +123,7 @@ func GetInstance() (*gorm.DB) {
 		}
 	} else {
 		log.Info("Instance already created")
-	}*/
+	} 
 
 	once.Do(func() {
 		log.Info("Creating a db instance")
@@ -104,4 +158,4 @@ func GetInstance() (*gorm.DB) {
 	})
 
 	return sharedInstance
-}
+}*/

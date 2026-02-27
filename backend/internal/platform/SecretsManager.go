@@ -3,65 +3,110 @@ package platform
 import (
 	"context"
 	"errors"
-	"sync"
+	"time"
+	"fmt"
 	"os"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel"
 	"github.com/redis/go-redis/v9"
 	"github.com/joho/godotenv"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
 	redisClient *redis.Client
-	redisOnce sync.Once
 )
 
-func getSecretsClient() *redis.Client {
-	redisOnce.Do(func ()  {
-		err := godotenv.Load()
+const SecretsManager = "secrets-manager"
 
-		if err != nil {
-			log.Warning("Couldn't load env", err)
-			return
-		}
+func InitSecretsManager(ctx context.Context) error {
+	tr := otel.Tracer(SecretsManager)
+	initCtx, span := tr.Start(ctx, fmt.Sprintf("%s.InitSecretsManager", SecretsManager))
+	defer span.End()
 
-
-		password := os.Getenv("SECRETS_PASSWORD")
-		host := os.Getenv("SECRETS_HOST")
-
-		redisClient = redis.NewClient(&redis.Options{
-			Addr: host,
-			Password: password,
-			DB: 0,
-			Protocol: 2,
-		})
-
-		log.Info("Secrets connection enabled")
-	})
-
-	return redisClient
-}
-
-func SaveSecret(key string, value string, ctx context.Context) error {
-	manager := getSecretsClient()
-
-	if manager == nil {
-		return errors.New("Empty Secrets")
+	if err := godotenv.Load(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, fmt.Sprintf("Unable to load env: %s", err.Error()))
+		return err
 	}
 
-	err := manager.Set(ctx, key, value, 0).Err()
+	password := os.Getenv("SECRETS_PASSWORD")
+	if password == "" {
+		err := errors.New("SECRETS_PASSWORD environment variable is empty")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, fmt.Sprintf("Unable to load env: %s", err.Error()))
+		return err
+	}
 
+	host := os.Getenv("SECRETS_HOST")
+	if host == "" {
+		err := errors.New("SECRETS_HOST environment variable is empty")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, fmt.Sprintf("Unable to load env: %s", err.Error()))
+		return err
+	}
+
+	redisClient = redis.NewClient(&redis.Options{
+		Addr: host,
+		Password: password,
+		DB: 0,
+		Protocol: 2,
+	})
+
+	pingCtx, cancel := context.WithTimeout(initCtx, 5*time.Second)
+	defer cancel()
+
+	_, err := redisClient.Ping(pingCtx).Result()
 	return err
 }
 
-func GetSecret(key string, ctx context.Context) (string, error)  {
-	manager := getSecretsClient()
+func SaveSecret(key string, value string, ctx context.Context) error {
+	tr := otel.Tracer(EmailManagerName)
+	saveCtx, span := tr.Start(ctx, fmt.Sprintf("%s.ensureBucketExists", EmailManagerName))
+	defer span.End()
 
-	if manager == nil {
+	if redisClient == nil {
+		err := errors.New("Empty Secrets")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
+	span.SetAttributes(
+		attribute.String("secret-key", key),
+	)
+
+	if err := redisClient.Set(saveCtx, key, value, 0).Err(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func GetSecret(key string, ctx context.Context) (string, error)  {
+	tr := otel.Tracer(EmailManagerName)
+	getCtx, span := tr.Start(ctx, fmt.Sprintf("%s.ensureBucketExists", EmailManagerName))
+	defer span.End()
+
+	if redisClient == nil {
+		err := errors.New("Empty Secrets")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "", errors.New("Empty Secrets")
 	}
 
-	val, err := manager.Get(ctx, key).Result()
+	span.SetAttributes(
+		attribute.String("secret-key", key),
+	)
+
+	val, err := redisClient.Get(getCtx, key).Result()
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
 
 	return val, err
 }

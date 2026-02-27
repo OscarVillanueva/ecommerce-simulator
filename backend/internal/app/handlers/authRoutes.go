@@ -289,7 +289,9 @@ func AuthRouter(router chi.Router) {
 
 		token, err := tools.GenerateJWT(
 			time.Now().UTC().Add(120 * time.Hour), 
-			map[string]any{ "uuid": user.Uuid, "name": user.Name })
+			map[string]any{ "uuid": user.Uuid, "name": user.Name },
+			ctx,
+		)
 
 		if err != nil {
 			span.RecordError(err)
